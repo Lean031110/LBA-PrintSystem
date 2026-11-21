@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lba_department_tree" model="ir.ui.view">
+        <field name="name">lba.print.department.tree</field>
+        <field name="model">lba.print.department</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="printer_ids" widget="many2many_tags"/>
+                <field name="category_ids" widget="many2many_tags"/>
+                <field name="job_count" string="Trabajos"/>
+                <field name="active" widget="boolean_toggle"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_lba_department_form" model="ir.ui.view">
+        <field name="name">lba.print.department.form</field>
+        <field name="model">lba.print.department</field>
+        <field name="arch" type="xml">
+            <form string="Departamento de impresión">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="Cocina"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code" placeholder="cocina"/>
+                            <field name="sequence"/>
+                            <field name="active"/>
+                        </group>
+                        <group>
+                            <field name="printer_ids" widget="many2many_tags"
+                                   placeholder="Impresoras del departamento"/>
+                        </group>
+                    </group>
+                    <group string="Categorías POS asignadas">
+                        <field name="category_ids" widget="many2many_tags"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_lba_department" model="ir.actions.act_window">
+        <field name="name">Departamentos LBA</field>
+        <field name="res_model">lba.print.department</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Departamentos de impresión</p>
+            <p>Caja, Cocina, Pizzería, Bar y Salón vienen precargados;
+            puedes añadir departamentos personalizados con sus impresoras y
+            categorías POS.</p>
+        </field>
+    </record>
+</odoo>

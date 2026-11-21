@@ -1,0 +1,9 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_lba_print_server_user,lba.print.server.user,model_lba_print_server,base.group_user,1,0,0,0
+access_lba_print_server_admin,lba.print.server.admin,model_lba_print_server,base.group_system,1,1,1,1
+access_lba_print_printer_user,lba.print.printer.user,model_lba_print_printer,base.group_user,1,0,0,0
+access_lba_print_printer_admin,lba.print.printer.admin,model_lba_print_printer,base.group_system,1,1,1,1
+access_lba_print_department_user,lba.print.department.user,model_lba_print_department,point_of_sale.group_pos_user,1,1,0,0
+access_lba_print_department_admin,lba.print.department.admin,model_lba_print_department,base.group_system,1,1,1,1
+access_lba_print_job_user,lba.print.job.user,model_lba_print_job,point_of_sale.group_pos_user,1,0,1,0
+access_lba_print_job_admin,lba.print.job.admin,model_lba_print_job,base.group_system,1,1,1,1

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_lba_root"
+              name="LBA Print"
+              sequence="45"/>
+
+    <menuitem id="menu_lba_server"
+              name="Servidor"
+              parent="menu_lba_root"
+              action="action_lba_server"
+              sequence="10"/>
+
+    <menuitem id="menu_lba_printer"
+              name="Impresoras"
+              parent="menu_lba_root"
+              action="action_lba_printer"
+              sequence="20"/>
+
+    <menuitem id="menu_lba_department"
+              name="Departamentos"
+              parent="menu_lba_root"
+              action="action_lba_department"
+              sequence="30"/>
+
+    <menuitem id="menu_lba_job"
+              name="Cola de trabajos"
+              parent="menu_lba_root"
+              action="action_lba_job"
+              sequence="40"/>
+</odoo>

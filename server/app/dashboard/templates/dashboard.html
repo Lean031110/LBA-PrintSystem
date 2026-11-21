@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Panel general{% endblock %}
+{% block content %}
+<h1>Panel general</h1>
+<p class="muted">{{ company }} · {{ printers|length }} impresoras registradas</p>
+
+<div class="grid cards">
+  <div class="card stat">
+    <span class="stat-num">{{ online }}</span>
+    <span class="stat-label">Impresoras accesibles</span>
+  </div>
+  <div class="card stat">
+    <span class="stat-num {{ 'err' if offline }}">{{ offline }}</span>
+    <span class="stat-label">Impresoras caídas</span>
+  </div>
+  <div class="card stat">
+    <span class="stat-num {{ 'warn' if queue_counts['pending'] + queue_counts['processing'] }}">{{ queue_counts['pending'] + queue_counts['processing'] }}</span>
+    <span class="stat-label">En cola</span>
+  </div>
+  <div class="card stat">
+    <span class="stat-num">{{ queue_counts['sent'] }}</span>
+    <span class="stat-label">Trabajos enviados</span>
+  </div>
+  <div class="card stat">
+    <span class="stat-num {{ 'err' if queue_counts['failed'] }}">{{ queue_counts['failed'] }}</span>
+    <span class="stat-label">Errores</span>
+  </div>
+</div>
+
+<h2>Impresoras</h2>
+{% if printers %}
+<div class="table-wrap">
+<table>
+  <thead><tr>
+    <th>Nombre</th><th>Fabricante</th><th>Modelo</th><th>IP</th><th>Puerto</th>
+    <th>Conexión</th><th>Papel</th><th>Protocolo</th><th>Estado</th><th>Última actividad</th>
+  </tr></thead>
+  <tbody>
+  {% for p in printers %}
+    <tr>
+      <td><a href="/devices/{{ p.id }}">{{ p.name }}</a></td>
+      <td>{{ p.manufacturer or '—' }}</td>
+      <td>{{ p.model or '—' }}</td>
+      <td>{{ p.ip }}</td>
+      <td>{{ p.port }}</td>
+      <td>{{ p.connection_type }}</td>
+      <td>{{ p.paper_width_mm }} mm ({{ p.columns }} col.)</td>
+      <td>{{ p.protocol }}</td>
+      <td><span class="badge badge-{{ 'ok' if p.status == 'online' else ('err' if p.status == 'offline' else '') }}">{{ p.status }}</span>{% if not p.active %} <span class="badge">inactiva</span>{% endif %}</td>
+      <td>{{ p.last_seen_at.strftime('%Y-%m-%d %H:%M') if p.last_seen_at else '—' }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="card empty">
+  No hay impresoras. Ve a <a href="/devices">Dispositivos</a> para dar de alta una
+  (IP + puerto) o a <a href="/discover">Buscar impresoras</a> para escanear la LAN.
+  Para probar sin hardware, ejecuta el simulador:
+  <code>python -m app.drivers.simulator --port 9910</code> y registra
+  127.0.0.1:9910 con perfil <em>simulator</em>.
+</div>
+{% endif %}
+
+<div class="grid two">
+  <div>
+    <h2>Últimos trabajos</h2>
+    {% include "partials/jobs_table.html" with context %}
+  </div>
+  <div>
+    <h2>Últimos errores</h2>
+    {% if errors %}
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Job</th><th>Impresora</th><th>Error</th><th>Actualizado</th></tr></thead>
+      <tbody>
+      {% for j in errors %}
+        <tr>
+          <td><a href="/jobs/{{ j.id }}">{{ j.id[:8] }}…</a></td>
+          <td>{{ j.printer_id[:8] }}…</td>
+          <td class="err-text">{{ j.last_error[:80] }}</td>
+          <td>{{ j.updated_at.strftime('%H:%M:%S') }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <div class="card empty">Sin errores registrados.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

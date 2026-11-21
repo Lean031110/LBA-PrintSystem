@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Buscar impresoras{% endblock %}
+{% block content %}
+<h1>Buscar impresoras en la LAN</h1>
+<p class="muted">Escaneo TCP pasivo (connect/close, no se escribe nada en las
+impresoras). Solo rangos de red privada autorizados: p. ej. <code>192.168.1.0/24</code>.
+Puertos sugeridos: <code>9100</code> (ESC/POS raw), <code>631</code> (IPP), <code>515</code> (LPD).</p>
+
+<form method="post" action="/discover" class="card form-grid">
+  <div class="f"><label>Rango CIDR *</label><input name="cidr" value="{{ ranges }}" required placeholder="192.168.1.0/24"></div>
+  <div class="f"><label>Puertos</label><input name="ports" value="{{ ports or '9100' }}" placeholder="9100 631"></div>
+  <div class="f f-wide"><button class="btn btn-primary" type="submit">Escanear</button></div>
+</form>
+
+{% if results is not none %}
+<h2>Resultados ({{ results|length }})</h2>
+{% if results %}
+<div class="table-wrap">
+<table>
+  <thead><tr><th>IP</th><th>Puerto</th><th>Servicio</th><th>Acción</th></tr></thead>
+  <tbody>
+  {% for r in results %}
+  <tr>
+    <td>{{ r.ip }}</td>
+    <td>{{ r.port }}</td>
+    <td>{{ r.service }}</td>
+    <td>
+      {% if r.port in (9100, 9910) %}
+      <form method="get" action="/devices" class="inline">
+        <input type="hidden" name="prefill_ip" value="{{ r.ip }}">
+        <input type="hidden" name="prefill_port" value="{{ r.port }}">
+        <a class="btn btn-xs" href="/devices">Registrar en Dispositivos</a>
+      </form>
+      {% else %}
+      <span class="muted">no ESC/POS</span>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="card empty">Ningún puerto abierto en ese rango.
+Si esperas una impresora: comprueba que está encendida, conectada por Ethernet
+y que su IP cae dentro del rango escaneado.</div>
+{% endif %}
+{% endif %}
+{% endblock %}

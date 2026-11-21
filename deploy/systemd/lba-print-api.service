@@ -1,0 +1,25 @@
+[Unit]
+Description=LBA Print Server — API REST y panel web
+Documentation=https://github.com/LBA-PrintSystem
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=lba
+Group=lba
+WorkingDirectory=/opt/lba/server
+EnvironmentFile=-/etc/lba-print/lba-print.env
+ExecStart=/opt/lba/server/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port ${LBA_PORT:-8000}
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/lba
+ProtectHome=true
+# Endurecimiento extra (LXC no privilegiado ya aísla del host)
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Detalle de trabajo{% endblock %}
+{% block content %}
+<h1>Trabajo {{ j.id[:8] }}…</h1>
+
+<div class="grid two">
+  <div class="card">
+    <h2>Datos</h2>
+    <dl class="kv">
+      <dt>Impresora</dt><dd><a href="/devices/{{ j.printer_id }}">{{ p.name if p else j.printer_id }}</a>{% if p %} ({{ p.ip }}:{{ p.port }}){% endif %}</dd>
+      <dt>Estado</dt><dd><span class="badge badge-{{ 'ok' if j.status == 'sent' else ('err' if j.status == 'failed' else ('warn' if j.status in ('pending', 'processing') else '')) }}">{{ j.status }}</span></dd>
+      <dt>Origen</dt><dd>{{ j.origin }}</dd>
+      <dt>Clave idempotente</dt><dd><code>{{ j.idempotency_key or '—' }}</code></dd>
+      <dt>Intentos</dt><dd>{{ j.attempts }}/{{ j.max_attempts }}</dd>
+      <dt>Creado</dt><dd>{{ j.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</dd>
+      <dt>Enviado</dt><dd>{{ j.sent_at.strftime('%Y-%m-%d %H:%M:%S') if j.sent_at else '—' }}</dd>
+      <dt>Bytes enviados</dt><dd>{{ j.bytes_len }}</dd>
+      <dt>Último error</dt><dd class="err-text">{{ j.last_error or '—' }}</dd>
+    </dl>
+    <div class="actions">
+      {% if j.status in ('failed', 'cancelled') %}
+      <form method="post" action="/queue/{{ j.id }}/retry"><button class="btn">Reintentar</button></form>
+      {% endif %}
+      {% if j.status == 'pending' %}
+      <form method="post" action="/queue/{{ j.id }}/cancel"><button class="btn">Cancelar</button></form>
+      {% endif %}
+      {% if j.status in ('sent', 'failed', 'cancelled') %}
+      <form method="post" action="/queue/{{ j.id }}/reprint" class="confirmable" data-msg="¿Reimprimir?"><button class="btn btn-primary">Reimprimir</button></form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Vista previa (reconstrucción de los bytes ESC/POS)</h2>
+    {% if j.preview_text %}
+    <pre class="ticket">{{ j.preview_text }}</pre>
+    {% else %}
+    <p class="muted">Sin bytes todavía (el trabajo no se ha enviado).</p>
+    {% endif %}
+    <h2>Hex (primeros 512 bytes)</h2>
+    <pre class="hex">{{ blob[:512].hex(' ') }}</pre>
+  </div>
+</div>
+
+<h2>Eventos</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Fecha</th><th>De</th><th>A</th><th>Detalle</th></tr></thead>
+  <tbody>
+  {% for e in events %}
+  <tr>
+    <td>{{ e.ts.strftime('%m-%d %H:%M:%S') }}</td>
+    <td>{{ e.from_status or '—' }}</td>
+    <td>{{ e.to_status }}</td>
+    <td class="muted">{{ e.detail }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

@@ -1,0 +1,39 @@
+{% if jobs %}
+<div class="table-wrap">
+<table>
+  <thead><tr>
+    <th>Job</th><th>Impresora</th><th>Origen</th><th>Estado</th><th>Intentos</th>
+    <th>Próximo intento</th><th>Creado</th><th>Enviado</th><th>Error</th><th>Acciones</th>
+  </tr></thead>
+  <tbody>
+  {% for j in jobs %}
+  {% set pname = (j.printer_id[:8] + '…') %}
+  <tr>
+    <td><a href="/jobs/{{ j.id }}">{{ j.id[:8] }}…</a></td>
+    <td>{{ pname }}</td>
+    <td>{{ j.origin }}</td>
+    <td><span class="badge badge-{{ 'ok' if j.status == 'sent' else ('err' if j.status == 'failed' else ('warn' if j.status in ('pending', 'processing') else '')) }}">{{ j.status }}</span></td>
+    <td>{{ j.attempts }}/{{ j.max_attempts }}</td>
+    <td>{{ j.next_attempt_at.strftime('%H:%M:%S') if j.status == 'pending' else '—' }}</td>
+    <td>{{ j.created_at.strftime('%m-%d %H:%M:%S') }}</td>
+    <td>{{ j.sent_at.strftime('%m-%d %H:%M:%S') if j.sent_at else '—' }}</td>
+    <td class="err-text">{{ (j.last_error or '')[:60] }}</td>
+    <td class="actions">
+      {% if j.status in ('failed', 'cancelled') %}
+      <form method="post" action="/queue/{{ j.id }}/retry"><button class="btn btn-xs">Reintentar</button></form>
+      {% endif %}
+      {% if j.status == 'pending' %}
+      <form method="post" action="/queue/{{ j.id }}/cancel"><button class="btn btn-xs">Cancelar</button></form>
+      {% endif %}
+      {% if j.status in ('sent', 'failed', 'cancelled') %}
+      <form method="post" action="/queue/{{ j.id }}/reprint" class="confirmable" data-msg="¿Reimprimir este ticket?"><button class="btn btn-xs">Reimprimir</button></form>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="card empty">Cola vacía para «{{ status_filter }}».</div>
+{% endif %}

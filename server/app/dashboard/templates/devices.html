@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Dispositivos{% endblock %}
+{% block content %}
+<h1>Dispositivos</h1>
+
+<h2>Añadir impresora</h2>
+<form method="post" action="/devices/add" class="card form-grid">
+  <div class="f"><label>Nombre *</label><input name="name" required placeholder="Cocina"></div>
+  <div class="f"><label>IP *</label><input name="ip" required placeholder="192.168.1.61"></div>
+  <div class="f"><label>Puerto</label><input name="port" type="number" value="9100" min="1" max="65535"></div>
+  <div class="f"><label>Fabricante</label><input name="manufacturer" placeholder="Rongta"></div>
+  <div class="f"><label>Modelo</label><input name="model" placeholder="RP326"></div>
+  <div class="f"><label>Perfil</label>
+    <select name="profile">
+      <option value="generic">generic — ESC/POS red</option>
+      <option value="simulator">simulator — emulador LBA</option>
+    </select>
+  </div>
+  <div class="f"><label>Ancho de papel</label>
+    <select name="paper_width_mm">
+      <option value="80">80 mm (48 columnas)</option>
+      <option value="58">58 mm (32 columnas)</option>
+    </select>
+  </div>
+  <div class="f"><label>Codificación</label>
+    <select name="encoding">
+      <option value="CP850">CP850 (español, recomendado)</option>
+      <option value="AUTO">AUTO (conmuta codepages)</option>
+      <option value="CP437">CP437</option>
+      <option value="CP852">CP852</option>
+      <option value="Windows-1252">Windows-1252</option>
+    </select>
+  </div>
+  <div class="f f-wide"><label>Notas</label><input name="notes" placeholder="Ubicación, DIP switches, hallazgos de compatibilidad…"></div>
+  <div class="f f-wide"><button class="btn btn-primary" type="submit">Registrar impresora</button></div>
+</form>
+
+<h2>Impresoras registradas ({{ printers|length }})</h2>
+{% if printers %}
+<div class="table-wrap">
+<table>
+  <thead><tr>
+    <th>Nombre</th><th>Fabricante</th><th>Modelo</th><th>IP</th><th>Puerto</th>
+    <th>Conexión</th><th>Papel</th><th>Protocolo</th><th>Estado</th><th>Última actividad</th><th>Acciones</th>
+  </tr></thead>
+  <tbody>
+  {% for p in printers %}
+  <tr>
+    <td><a href="/devices/{{ p.id }}">{{ p.name }}</a></td>
+    <td>{{ p.manufacturer or '—' }}</td>
+    <td>{{ p.model or '—' }}</td>
+    <td>{{ p.ip }}</td>
+    <td>{{ p.port }}</td>
+    <td>{{ p.connection_type }}</td>
+    <td>{{ p.paper_width_mm }} mm ({{ p.columns }} col.)</td>
+    <td>{{ p.protocol }}</td>
+    <td><span class="badge badge-{{ 'ok' if p.status == 'online' else ('err' if p.status == 'offline' else '') }}">{{ p.status }}</span>{% if not p.active %} <span class="badge">inactiva</span>{% endif %}</td>
+    <td>{{ p.last_seen_at.strftime('%Y-%m-%d %H:%M') if p.last_seen_at else '—' }}</td>
+    <td class="actions">
+      <form method="post" action="/devices/{{ p.id }}/toggle"><button class="btn btn-xs" title="Activar/desactivar">{{ 'Desactivar' if p.active else 'Activar' }}</button></form>
+      <form method="post" action="/devices/{{ p.id }}/delete" class="confirmable" data-msg="¿Eliminar {{ p.name }}?"><button class="btn btn-xs btn-danger">Eliminar</button></form>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="card empty">Sin impresoras todavía. Añade una arriba o usa
+<a href="/discover">Buscar impresoras</a>.</div>
+{% endif %}
+{% endblock %}

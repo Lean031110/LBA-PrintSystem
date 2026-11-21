@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lba_server_tree" model="ir.ui.view">
+        <field name="name">lba.print.server.tree</field>
+        <field name="model">lba.print.server</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="base_url"/>
+                <field name="port"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'online'"
+                       decoration-danger="state == 'offline'"/>
+                <field name="printer_count" string="Impresoras"/>
+                <field name="last_check"/>
+                <field name="active" widget="boolean_toggle"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_lba_server_form" model="ir.ui.view">
+        <field name="name">lba.print.server.form</field>
+        <field name="model">lba.print.server</field>
+        <field name="arch" type="xml">
+            <form string="LBA Print Server">
+                <header>
+                    <button name="action_test_connection" type="object"
+                            string="Probar conexión"
+                            class="btn-primary" icon="fa-plug"/>
+                    <button name="action_sync_printers" type="object"
+                            string="Sincronizar impresoras"
+                            icon="fa-refresh"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,online,offline"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Inactivo"
+                            bg_color="text-bg-danger"
+                            invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="LBA Print Server"/></h1>
+                    </div>
+                    <group>
+                        <group string="Conexión">
+                            <field name="base_url" placeholder="http://192.168.1.50"/>
+                            <field name="port"/>
+                            <field name="api_token" password="True"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group string="Estado">
+                            <field name="last_check" readonly="1"/>
+                            <field name="last_message" readonly="1"/>
+                            <field name="printer_count"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Impresoras sincronizadas" name="printers">
+                            <field name="printer_ids">
+                                <tree>
+                                    <field name="name"/>
+                                    <field name="manufacturer"/>
+                                    <field name="model"/>
+                                    <field name="ip"/>
+                                    <field name="port"/>
+                                    <field name="paper_width_mm" string="Papel (mm)"/>
+                                    <field name="encoding"/>
+                                    <field name="status" widget="badge"
+                                           decoration-success="status == 'online'"
+                                           decoration-danger="status == 'offline'"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_lba_server" model="ir.actions.act_window">
+        <field name="name">Servidor LBA</field>
+        <field name="res_model">lba.print.server</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Conecta tu LBA Print Server</p>
+            <p>URL, puerto y token del panel → botones "Probar conexión" y
+            "Sincronizar impresoras".</p>
+        </field>
+    </record>
+</odoo>

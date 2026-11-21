@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Seguridad y copias de seguridad{% endblock %}
+{% block content %}
+<h1>Seguridad y copias de seguridad</h1>
+
+{% if new_token %}
+<div class="flash flash-ok">
+  <strong>Nuevo token creado — cópialo ahora, no se volverá a mostrar:</strong>
+  <code class="token-value">{{ new_token }}</code>
+  Pégalo en Odoo → LBA Print → Servidor → Token.
+</div>
+{% endif %}
+
+<div class="grid two">
+  <div>
+    <h2>Tokens de API</h2>
+    <form method="post" action="/security/tokens" class="card form-grid">
+      <div class="f"><label>Nombre del token</label>
+        <input name="token_name" placeholder="odoo-production"></div>
+      <div class="f"><button class="btn btn-primary" type="submit">Crear token</button></div>
+    </form>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Prefijo</th><th>Nombre</th><th>Creado</th><th>Acción</th></tr></thead>
+      <tbody>
+      {% for t in tokens %}
+      <tr>
+        <td><code>{{ t.prefix }}…</code></td>
+        <td>{{ t.name }}</td>
+        <td>{{ t.created }}</td>
+        <td>
+          <form method="post" action="/security/tokens/{{ t.prefix }}/revoke"
+                class="confirmable" data-msg="¿Revocar {{ t.prefix }}…? Odoo dejará de autenticarse con él.">
+            <button class="btn btn-xs btn-danger">Revocar</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <p class="muted small">Los tokens se guardan solo con hash SHA-256; el
+    valor completo se muestra una única vez al crearlo.</p>
+  </div>
+
+  <div>
+    <h2>Contraseña del admin</h2>
+    <form method="post" action="/security/password" class="card form-grid">
+      <div class="f"><label>Contraseña actual</label>
+        <input name="current_password" type="password" required></div>
+      <div class="f"><label>Nueva contraseña (8+)</label>
+        <input name="new_password" type="password" minlength="8" required></div>
+      <div class="f f-wide"><button class="btn btn-primary" type="submit">Cambiar contraseña</button></div>
+    </form>
+
+    <h2>Copia de seguridad</h2>
+    <div class="card note">
+      <p>Descarga una copia consistente de SQLite (impresoras, cola,
+      configuración, auditoría).</p>
+      <a class="btn" href="/backup">Descargar backup (.db)</a>
+      <p class="muted small">En producción usa también
+      <code>deploy/scripts/backup.sh</code> (programable por cron del LXC).</p>
+    </div>
+  </div>
+</div>
+
+<h2>Registro de auditoría (últimas 50)</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Fecha</th><th>IP</th><th>Sujeto</th><th>Acción</th><th>Detalle</th></tr></thead>
+  <tbody>
+  {% for a in audits %}
+  <tr>
+    <td>{{ a.ts.strftime('%m-%d %H:%M:%S') }}</td>
+    <td>{{ a.ip }}</td>
+    <td>{{ a.subject }}</td>
+    <td>{{ a.action }}</td>
+    <td class="muted small">{{ a.detail }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

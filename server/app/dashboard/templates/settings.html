@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Configuración del servidor{% endblock %}
+{% block content %}
+<h1>Configuración del servidor</h1>
+
+<form method="post" action="/settings" class="card form-grid">
+  <div class="f"><label>Nombre de la empresa (tickets)</label>
+    <input name="company_name" value="{{ company }}"></div>
+  <div class="f"><label>Rangos de discovery (CIDR)</label>
+    <input name="discovery_ranges" value="{{ ranges }}" placeholder="192.168.1.0/24, 192.168.2.0/24"></div>
+  <div class="f f-wide"><label>Allowlist de clientes (CIDR, API y panel)</label>
+    <input name="ip_allowlist" value="{{ allowlist }}" placeholder="127.0.0.1/32, 192.168.1.0/24"></div>
+  <div class="f"><label>Límite API (peticiones/minuto)</label>
+    <input name="api_limit" type="number" min="10" max="10000" value="{{ api_rate.limit }}"></div>
+  <div class="f"><label>Retención del historial (días)</label>
+    <input name="retention_days" type="number" min="1" max="365" value="{{ retention }}"></div>
+  <div class="f"><label>¿Permitir IPs públicas como impresoras?</label>
+    <select name="allow_public">
+      <option value="false" {{ 'selected' if not allow_public }}>No (recomendado, anti-SSRF)</option>
+      <option value="true" {{ 'selected' if allow_public }}>Sí (excepción justificada)</option>
+    </select>
+  </div>
+  <div class="f f-wide"><button class="btn btn-primary" type="submit">Guardar configuración</button></div>
+</form>
+
+<div class="card note">
+  <strong>API y panel</strong> corren en el mismo proceso (puerto 8000 por
+  defecto). Documentación OpenAPI de la API en <a href="/docs" target="_blank">/docs</a>.
+  El worker es un servicio systemd separado
+  (<code>lba-print-worker.service</code>): si se cae, la API sigue viva.
+</div>
+{% endblock %}

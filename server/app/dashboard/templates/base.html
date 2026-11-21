@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Panel{% endblock %} · LBA Print Server</title>
+  <link rel="stylesheet" href="/static/css/lba.css">
+  <script src="/static/vendor/htmx.min.js" defer></script>
+  <script src="/static/js/lba.js" defer></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark">LBA</span>
+      <span class="brand-name">Print Server</span>
+    </div>
+    <nav>
+      <a href="/" class="{{ 'active' if section == 'dashboard' }}">Panel general</a>
+      <a href="/devices" class="{{ 'active' if section in ('devices', 'device_form') }}">Dispositivos</a>
+      <a href="/discover" class="{{ 'active' if section == 'discover' }}">Buscar impresoras</a>
+      <a href="/test_print" class="{{ 'active' if section == 'test_print' }}">Prueba de impresión</a>
+      <a href="/queue" class="{{ 'active' if section == 'queue' }}">Cola <span class="pill {{ 'pill-warn' if queue_counts['pending'] or queue_counts['processing'] }}" >{{ queue_counts['pending'] + queue_counts['processing'] }}</span></a>
+      <a href="/history" class="{{ 'active' if section == 'history' }}">Historial</a>
+      <a href="/errors" class="{{ 'active' if section == 'errors' }}">Errores <span class="pill pill-err {{ 'hidden' if not queue_counts['failed'] }}">{{ queue_counts['failed'] }}</span></a>
+      <div class="nav-sep"></div>
+      <a href="/settings" class="{{ 'active' if section == 'settings' }}">Configuración</a>
+      <a href="/security" class="{{ 'active' if section == 'security' }}">Seguridad y copias</a>
+    </nav>
+    <div class="sidebar-foot">
+      <span>{{ APP_NAME }} v{{ APP_VERSION }}</span>
+      <form method="post" action="/logout">
+        <button class="btn btn-ghost btn-xs" type="submit">Salir</button>
+      </form>
+    </div>
+  </aside>
+  <main class="content">
+    {% if flash %}
+    <div class="flash flash-{{ flash.kind or 'ok' }}" role="status">{{ flash.msg }}</div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+</body>
+</html>
