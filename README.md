@@ -1,6 +1,6 @@
 # LBA PRINT SYSTEM
 
-Sistema de impresión térmica para **Odoo 19 Community** en red local, sin nube, sin Docker y sin IoT Box. Equivalente a una "IoT Box" especializada en impresoras, con dos componentes:
+Sistema de impresión térmica para **Odoo 19 Community** en red local, sin nube y sin Docker. Se limita a impresión ESC/POS de red y puede coexistir con las impresoras y periféricos nativos de Odoo; no pretende reemplazar todas las capacidades de IoT Box. Consta de dos componentes:
 
 | Componente | Tecnología | Qué hace |
 |---|---|---|
@@ -22,6 +22,7 @@ Sistema de impresión térmica para **Odoo 19 Community** en red local, sin nube
 | [docs/PROXMOX_INSTALLATION.md](docs/PROXMOX_INSTALLATION.md) | Instalación en LXC no privilegiado de Proxmox |
 | [docs/SECURITY.md](docs/SECURITY.md) | Modelo de amenazas y mitigaciones |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Fases con objetivos y criterios de aceptación |
+| [docs/FINAL_AUDIT.md](docs/FINAL_AUDIT.md) | Hallazgos, correcciones, evidencia y gates pendientes de esta auditoría |
 | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Guía de usuario del panel y del conector |
 
 ## Arranque rápido (desarrollo, sin impresora)
@@ -54,20 +55,25 @@ Ver [docs/PROXMOX_INSTALLATION.md](docs/PROXMOX_INSTALLATION.md) (LXC Debian 12 
 ```bash
 cd server && . .venv/bin/activate && PYTHONPATH=. python -m pytest -q
 cd ..
-node odoo_addons/lba_print_connector/tests/test_lba_templates.mjs
+python3 -m unittest discover -s deploy/tests -v
+node --test odoo_addons/lba_print_connector/tests/*.mjs
 ```
 
 ### Estado de QA del addon Odoo
 
-El trabajo está en `fix/odoo19-addon-qa-layouts`; el commit de código validado
-por ambos workflows es `d3c99b323c78af9b1bedcfa4f635391e44a3d0fe`. Quedaron
-verdes en GitHub Actions el [CI de Odoo 19](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45237021879)
-(instalación limpia, TransactionCase y actualización en una segunda base con
-PostgreSQL 16) y el [CI del servidor](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45237021802)
-(44 tests y smoke end-to-end con simulador/worker/panel).
+El trabajo está en `fix/odoo19-addon-qa-layouts`. En esta reevaluación se
+ejecutaron localmente 60 tests del servidor, 22 pruebas de despliegue aisladas,
+y dos archivos Node del addon, además de validaciones sintácticas Python/XML,
+`bash -n` y `git diff --check`. El HEAD remoto/base `7ae0857d6ae9cf50f4d1c6470fe54171527e34ed`
+tiene [CI de Odoo](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45239085651)
+y [CI de servidor](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45239085620)
+verdes; ambos corresponden solo a ese SHA. Los cambios actuales están separados
+en commits QA locales y aún requieren push para obtener CI del nuevo código;
+no hay paquetes finales de esa revisión.
 
-Esto no valida el patch OWL en navegador, el flujo integrado Odoo↔servidor LBA
-ni impresión física. La matriz con evidencia y pendientes está en
+Esto no valida TransactionCase del código local actual, el patch OWL en
+navegador, el flujo integrado Odoo↔servidor LBA, instalación en LXC ni
+impresión física. La matriz con evidencia y pendientes está en
 [docs/ODOO_VALIDACION.md](docs/ODOO_VALIDACION.md). No instalar esta rama ni
 ejecutar migraciones en la base real de Lo D’ Leo.
 

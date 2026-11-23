@@ -6,7 +6,7 @@ El addon (`odoo_addons/lba_print_connector`) depende de `point_of_sale` y `pos_r
 
 ## 1. Instalación de desarrollo
 
-La instalación limpia y la actualización se pretenden validar en GitHub Actions mediante [`.github/workflows/ci-odoo-addon.yml`](../.github/workflows/ci-odoo-addon.yml), usando Odoo 19.0 y PostgreSQL 16. El workflow está añadido en esta rama, pero no debe considerarse verde hasta que exista una ejecución completada con logs.
+Hay evidencia histórica de instalación limpia/TransactionCase/actualización en GitHub Actions, pero siempre debe atribuirse al SHA exacto. El run [45239085651](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45239085651) pasó en el commit base `7ae0857d6ae9cf50f4d1c6470fe54171527e34ed`; no ejecuta las modificaciones locales sin commit de esta continuación. La matriz vigente y sus límites están en [`ODOO_VALIDACION.md`](ODOO_VALIDACION.md).
 
 Para probar manualmente, usar únicamente una instancia de desarrollo/QA separada y una base de datos descartable autorizada. No instalar esta rama en la base de producción de Lo D’ Leo. El despliegue de una versión estable deberá seguir un plan de respaldo y migración revisado por el administrador.
 
@@ -20,7 +20,7 @@ Para probar manualmente, usar únicamente una instancia de desarrollo/QA separad
 | `lba.print.template` / `.block` | Editor de bloques ordenados, alcance por impresora/departamento/general, vista previa de 58/80 mm y serialización segura. |
 | `lba.print.job` | Cola durable de salida local, idempotencia, intentos, errores y consulta/retry remoto. |
 
-Las reglas ACL y de compañía están declaradas en `security/`. Su comportamiento en una base real aún requiere ejecutar el workflow y comprobarlo en Odoo.
+Las reglas ACL y de compañía están declaradas en `security/`. Los tests TransactionCase del código modificado aún no se ejecutaron en runtime Odoo local; el CI del SHA base no acredita las modificaciones de esta continuación.
 
 ## 3. Flujo del TPV y estados
 
@@ -45,7 +45,7 @@ La ejecución real del cron, el bloqueo bajo varios workers y el despacho ante f
 - Las impresoras de comanda Odoo que no se enrutan a LBA conservan la ruta nativa mediante `super`. Los recibos solo usan LBA cuando el TPV tiene LBA activado y una impresora de recibos configurada.
 - No se envían tickets de delta vacíos.
 
-Los detalles dependen de la estructura de datos POS de Odoo 19 descrita en `ODOO19_REFERENCE.md`; la ejecución OWL/navegador aún no está verificada.
+El routing JS se verificó con los tests Node locales (incluyendo primaria/failover); esto no valida la ejecución OWL/navegador ni el POS real. Los detalles dependen de la estructura de datos POS de Odoo 19 descrita en `ODOO19_REFERENCE.md`.
 
 ## 5. Idempotencia y reimpresiones
 
@@ -61,20 +61,17 @@ El serializador de plantilla genera el documento usado por el flujo POS; la vist
 
 ## 7. Verificación disponible y pendiente
 
-Comandos locales desde la raíz del repositorio:
+Comandos locales desde la raíz del repositorio (solo verificaciones estáticas/unitarias; no sustituyen runtime Odoo):
 
 ```bash
-node odoo_addons/lba_print_connector/tests/test_lba_templates.mjs
+node --test odoo_addons/lba_print_connector/tests/*.mjs
 python3 -m compileall -q odoo_addons/lba_print_connector
 ```
 
-La instalación limpia y actualización del addon ya pasaron en CI con Odoo 19.0
-y PostgreSQL 16 ([run 45237021879](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45237021879),
-SHA `d3c99b323c78af9b1bedcfa4f635391e44a3d0fe`). Eso verifica carga de modelos,
-datos, ACL, vistas y TransactionCase en las bases aisladas del workflow; no
-verifica todavía el patch OWL en navegador, el TPV conectado a un servidor LBA
-real/simulado, ni una impresora física. El detalle de evidencia y límites está
-en [`ODOO_VALIDACION.md`](ODOO_VALIDACION.md).
+Las acciones remotas actualmente verificadas son históricas del SHA base
+`7ae0857...` (run 45239085651). La configuración del workflow local fija Odoo
+19 a `62c2f793058de87ff453532f206a96a1e71845d2`, pero esa versión del workflow
+aún no se ha ejecutado. Ninguno de esos datos valida el código local actual.
 
 ## 8. Límites explícitos
 

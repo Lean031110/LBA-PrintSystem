@@ -7,7 +7,7 @@
 | Exposición a Internet | puerto 8000 | LXC solo en bridge LAN; sin reenvío de puertos; firewall perimetral; allowlist de IPs en la propia app |
 | Abuso de la API | cliente no autorizado en LAN | token Bearer obligatorio (excepto `/health` sin datos); 403 por IP fuera de allowlist |
 | Robo de token | almacenamiento | tokens aleatorios `secrets.token_urlsafe(32)`; en BD solo hash SHA-256 + prefijo (el valor completo se muestra UNA vez al crear); nunca en código ni en el repo (`.gitignore` cubre `data/`, `.env`) |
-| Fuerza bruta de login | panel | PBKDF2-HMAC-SHA256 260 000 iteraciones + salt; rate limit 8/min por IP en `/login`; cookie de sesión firmada (itsdangerous, TTL 8 h) |
+| Fuerza bruta de login | panel | PBKDF2-HMAC-SHA256 260 000 iteraciones + salt; rate limit 8/min por IP en `/login`; cookie firmada (itsdangerous, TTL 8 h). **`Secure`/HTTPS obligatorio aún no está implementado ni verificado.** |
 | SSRF | `POST /printers`, `POST /jobs`, `discovery` | IPs validadas contra rangos privados (RFC1918 + loopback + link-local); **169.254.169.254 y 100.64.0.0/10 bloqueados**; IPs públicas rechazadas salvo configuración explícita `allow_public_printer_ips` (default false) |
 | Payload malicioso | `POST /jobs` | Pydantic con unión discriminada, límites de tamaño/longitud (≤200 bloques, base64 ≤ 300 KB, total ≤ 1 MB); `image` solo `logo` registrado o base64 (nunca rutas de archivo) |
 | Escalada en el LXC | contenedor | **LXC no privilegiado** (`--unprivileged 1`), usuario de servicio sin shell (`lba`), archivos propiedad del usuario |
@@ -31,12 +31,12 @@
 ## 4. Operación
 
 - Sin Internet en operación normal (HTMX vendorizado, sin CDN/fonts externas).
-- `GET /health` no expone datos (solo versión/estado/uptime).
+- `GET /health` no expone datos operativos: estado, app, versión y uptime; sin inventario ni conteos. La prueba local de auth/health se registra en `FINAL_AUDIT.md`.
 - Log de auditoría exportable (Panel → Seguridad) para revisiones.
 - Copias: ver `PROXMOX_INSTALLATION.md` §4.
 
 ## 5. Pendiente / recomendaciones
 
-1. HTTPS interno en LAN (proxy inverso con cert autofirmado) — no implementado v1 (LAN aislada); documentado en ROADMAP.
+1. HTTPS interno en LAN, validación TLS/SAN/renovación y atributo `Secure` de cookie — pendientes. No confiar en una LAN aislada como sustituto de TLS; el despliegue debe estar limitado por firewall hasta cerrar este gate.
 2. Fail2ban-like: hoy es rate-limit; si se requiere, ban temporal por IP (ROADMAP).
 3. Confirmación física de impresión (DLE EOT status) — ROADMAP (mejoraría "sent"→"printed" real).

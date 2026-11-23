@@ -3,6 +3,15 @@
 Formato: por fase, con objetivos → entregables → pruebas → pendientes.
 Rama de trabajo actual: `fix/odoo19-addon-qa-layouts`; la fundación `feature/lba-print-foundation` no se modificó.
 
+## Continuación de auditoría/estabilización — 2026-11-23 (QA local, sin release)
+
+- En la rama `fix/odoo19-addon-qa-layouts`, sobre HEAD base `7ae0857d6ae9cf50f4d1c6470fe54171527e34ed`, se reparó el staging de restore para no cambiar `/etc` y normalizar permisos; backup rechaza symlinks/hardlinks; ACL y guard ORM bloquean creación POS directa incluso para responsables y solo managers/admin editan rutas de departamentos; el controlador eleva tras validar sesión/configuración; 409 remoto exige ID y estado conocido; health consulta SQLite; reimpresión de impresora archivada se rechaza; idempotencia resuelve errores de concurrencia SQLite; claim y evento se confirman juntos; walkthrough usa temporales privados y limpieza por defecto.
+- Evidencia local reejecutada: servidor **60 passed, 46 warnings**; despliegue **22 passed** con rutas temporales/mocks (incluye casos Proxmox simulados); Node **2 archivos passed**. Bash `-n` validó **8 scripts**, compileall/AST Python **55 archivos**, parseo XML **11 archivos**, PyYAML **2 workflows** y `git diff --check` pasó. Las pruebas no equivalen a Proxmox real, LXC, runtime Odoo, navegador ni hardware.
+- GitHub: [CI servidor 45239085620](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45239085620) y [CI Odoo 45239085651](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45239085651) terminaron `success` en el SHA base `7ae0857...`; no ejecutan cambios locales. El workflow Odoo local fija upstream `62c2f793058de87ff453532f206a96a1e71845d2`, pero requiere una nueva ejecución para validarlo.
+- El empaquetador se construyó dos veces para el SHA base antes de estos cambios locales, con salidas reproducibles. No se generaron paquetes actuales, no se descargó/verificó artefacto final y no se publica release.
+- El builder QA se amplió para exigir `LICENSE`/`CHANGELOG.md` en ambos artefactos e incluir `INSTALL.md` dentro del ZIP Odoo; el build final limpio de esta revisión y su verificación SHA aún están pendientes.
+- Pendientes: CI del nuevo SHA y TransactionCase de las nuevas regresiones Odoo, instalación LXC Debian 12/systemd, navegador OWL/TPV, E2E Odoo↔LBA, stress multiproceso, HTTPS y cookie `Secure`, offline, hashes del paquete final, renderer `profile`/`density`, verificación hash de plantilla Proxmox/CT preexistente, validación física autorizada. No se desplegó producción, no se accedió a la BD de Lo D’ Leo, no se escaneó la LAN ni se enviaron comandos a hardware.
+
 ## Auditoría y QA del addon — 2026-11-23 (rama de trabajo)
 
 - Se agregó CI de instalación limpia y actualización de `lba_print_connector` sobre Odoo 19.0/PostgreSQL 16. El run final [45237021879](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45237021879), SHA `d3c99b323c78af9b1bedcfa4f635391e44a3d0fe`, pasó la instalación, los TransactionCase y la actualización del addon en una segunda base aislada. Los logs registran 22 tests y 0 fallos/errores tanto en instalación como en upgrade.

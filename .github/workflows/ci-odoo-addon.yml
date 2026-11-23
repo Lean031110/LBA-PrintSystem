@@ -33,6 +33,7 @@ jobs:
       PGUSER: odoo
       PGPASSWORD: odoo
       ODOO_ADDONS: odoo/addons,odoo_addons
+      ODOO_COMMIT: 62c2f793058de87ff453532f206a96a1e71845d2
     steps:
       - name: Checkout LBA Print System
         uses: actions/checkout@v4
@@ -53,7 +54,13 @@ jobs:
           sudo npm install --global rtlcss
 
       - name: Clonar código oficial Odoo 19 Community
-        run: git clone --depth 1 --branch 19.0 https://github.com/odoo/odoo.git odoo
+        run: |
+          git init odoo
+          git -C odoo remote add origin https://github.com/odoo/odoo.git
+          git -C odoo fetch --depth 1 origin "$ODOO_COMMIT"
+          git -C odoo checkout --detach FETCH_HEAD
+          test "$(git -C odoo rev-parse HEAD)" = "$ODOO_COMMIT"
+          echo "Odoo upstream commit: $ODOO_COMMIT"
 
       - name: Instalar dependencias Python oficiales de Odoo
         run: |
@@ -75,7 +82,7 @@ jobs:
           PY
 
       - name: Probar serializador y claves del POS
-        run: node odoo_addons/lba_print_connector/tests/test_lba_templates.mjs
+        run: node --test odoo_addons/lba_print_connector/tests/*.mjs
 
       - name: Crear base de datos aislada para instalación limpia
         run: createdb --maintenance-db=postgres lba_odoo19_install
@@ -122,6 +129,9 @@ jobs:
             --stop-after-init --log-level=test \
             --logfile=lba-odoo-upgrade.log
 
+      - name: Construir paquetes QA del commit probado
+        run: python deploy/scripts/build_packages.py --output "$RUNNER_TEMP/lba-packages"
+
       - name: Publicar logs de instalación y pruebas
         if: always()
         uses: actions/upload-artifact@v4
@@ -132,3 +142,11 @@ jobs:
             lba-odoo-install.log
             lba-odoo-upgrade-setup.log
             lba-odoo-upgrade.log
+
+      - name: Publicar paquetes QA y SHA-256
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lba-packages-${{ github.sha }}
+          if-no-files-found: error
+          path: ${{ runner.temp }}/lba-packages/*

@@ -7,12 +7,12 @@
 
 | Componente | Requisito | Origen |
 |---|---|---|
-| LBA Print Server | Python 3.12 (3.10+ tolerado), Debian 12/Ubuntu en LXC | [V] entorno de desarrollo |
+| LBA Print Server | Python 3.12 ejecutado en sandbox; Python 3.10–3.11 y Debian 12/LXC sin validación de instalación en esta campaña | Evidencia local acotada; matriz/LXC pendientes |
 | FastAPI / SQLAlchemy / Jinja2 / HTMX 2.0.4 (vendorizado) | — | [V] `server/requirements.txt` |
 | python-escpos | **3.1** (2023-12-17, MIT), Python 3.8–3.12 | [V] https://pypi.org/project/python-escpos/ |
 | Odoo 19 Community | Python **≥ 3.10** (`setup.py`, `MIN_PY_VERSION=(3,10)`), recomendado 3.11/3.12 | [V] clon rama 19.0; guías de instalación 2026 |
 | OWL del TPV | @odoo/owl **2.8.4** vendida en el core | [V] `addons/web/static/lib/owl/owl.js` |
-| Proxmox VE | LXC no privilegiado Debian 12; 1 vCPU, 1 GB RAM, 8 GB disco | [V] diseño de instalación (Fase 7) |
+| Proxmox VE | Diseño para LXC no privilegiado Debian 12; creación real en Proxmox no verificada | Implementación de scripts no equivale a despliegue |
 
 ## 2. Impresoras — matriz
 
@@ -26,12 +26,12 @@
 | **Xprinter XP-N160** | 80 mm | USB + Ethernet | Sí (misma familia) | [HW] | `generic` | Candidato |
 | Xprinter XP-58 (USB/BT) | 58 mm | sin LAN | Sí | — | — | [—] sin red: fuera de v1 |
 | **Volcora (modelo no identificado)** | desconocido | Wi-Fi [dato del usuario, sin verificar] | desconocido | desconocido | desconocido | Uso previsto en cocina; térmica [dato del usuario]. No se han probado protocolo, ancho, puerto ni funciones. |
-| Epson TM-T88V… | 80 mm | Ethernet | Sí | Sí | `generic`/perfil escpos-db | Compatible (no es objetivo de compra) |
+| Epson TM-T88V… | 80 mm | Ethernet | Sí | Sí | `generic` (perfil específico no aplicado) | Compatibilidad a confirmar por modelo |
 | **LBA Simulator** (incluido) | virtual | TCP local | emulado | Sí (puerto libre) | `simulator` | [V] usado en pruebas y demo |
 
 Notas:
 - Ningún fabricante "clon" publica en la ficha el literal "puerto 9100": el **estándar de facto** de la interfaz Ethernet ESC/POS es raw 9100 y así lo usan sus utilidades de IP. Aun así, LBA **no lo afirma como verificado por modelo** hasta la comprobación §5 (regla nº 11 del encargo).
-- Cualquier impresora de red compatible ESC/POS que acepte raw 9100 funciona con el perfil `generic`; los perfiles específicos de escpos-printer-db se pueden seleccionar por dispositivo en la configuración.
+- El renderer actual usa el perfil predeterminado de `python-escpos`; el campo `profile` del registro no selecciona capacidades específicas por impresora. `density` tampoco modifica los bytes. No atribuir soporte específico por perfil ni control de densidad hasta implementar pruebas unitarias y validación física en un modelo identificado.
 
 ## 3. Características por dispositivo (configurables por impresora)
 
@@ -41,7 +41,7 @@ Notas:
 | Codificación de caracteres | `CP437`, `CP850`, `CP852`, `Windows-1252` (por defecto `CP850` para español) | [HW] ticket de prueba con "áéíóúñ ¿¡ €" |
 | Alineación | izq / centro / dcha (ESC a) | [V] escpos 3.1 |
 | Negrita / tamaño | ESC E y GS ! (ancho/alto 1–8) | [V] escpos 3.1 |
-| Densidad | comando GS `!` / configuración de perfil | [HW] |
+| Densidad | No aplicada por el renderer actual; el campo de configuración no acredita control de densidad | **No implementado** |
 | Corte | total (`GS V 0/1`) / parcial (`GS V 66 m`) / feed antes de cortar | [HW] modo soportado por firmware |
 | QR | GS ( k (module/box, EC) | [HW] tamaño máximo aceptado |
 | Código de barras | EAN13/EAN8/UPC-A/UPC-E/CODE128/CODE39/ITF (python-barcode) | [HW] HRI y alturas |

@@ -30,6 +30,8 @@ adduser --system --group --home /opt/lba --shell /usr/sbin/nologin lba
 
 Alternativa reproducible: `deploy/proxmox/create_lba_ct.sh` (mismo procedimiento con controles).
 
+El script reutiliza un archivo de plantilla local ya presente y evita volver a descargarlo; **no valida su identidad por hash criptográfico**. Antes de usar una plantilla preexistente, el operador debe verificar origen y checksum por un canal confiable. No interpretar “presente/local” como “verificada”.
+
 ## 2. Instalar el servidor (dentro del CT)
 
 ```bash
@@ -60,9 +62,11 @@ Servicios (`deploy/systemd/`): separados por diseño (DADR-04) — la API nunca 
 | Operación | Script | Qué hace |
 |---|---|---|
 | Actualizar | `deploy/scripts/update.sh` | `git pull` (o rsync del código), `pip install -r requirements.txt`, migración `init_db` idempotente, `systemctl restart lba-print-{api,worker}` |
-| Backup | `deploy/scripts/backup.sh` | `sqlite3 … ".backup"` consistente (API en WAL) + tar de config → `/var/backups/lba/lba-YYYYmmdd.tar.gz` |
-| Restaurar | `deploy/scripts/restore.sh` | para servicios, restaura tar, verifica `health` |
-| Desinstalar | `deploy/scripts/uninstall.sh` | para servicios, borra unidades, opcionalmente conserva `/var/lib/lba` |
+| Backup | `deploy/scripts/backup.sh` | Copia SQLite consistente `.db`, archivo de configuración separado `lba-config-*.tar.gz` (si existe) y `*.sha256`; directorio/archivos root-only. Rechaza symlinks/hardlinks de configuración para mantener compatibilidad con el validador de restore. Retiene 14 conjuntos. No crea un tar combinado. |
+| Restaurar | `deploy/scripts/restore.sh <db> [config.tar.gz]` | Valida integridad/configuración, usa staging privado sin cambiar permisos del padre existente, normaliza directorios a 0750/archivos a 0640, reemplaza con rollback ante fallos y comprueba readiness SQLite/HTTP en el puerto restaurado. Ejecutar solo en una instancia controlada. |
+| Desinstalar | `deploy/scripts/uninstall.sh` | Detiene servicios y elimina código/unidades; conserva datos y configuración por defecto. `--purge-data` elimina ambos explícitamente. |
+
+Las pruebas automatizadas de scripts usan temporales, `sudo` y mocks; no equivalen a una instalación/restauración en Debian 12/LXC con systemd real. No desplegar esta rama en producción hasta superar ese gate.
 
 ## 5. Criterios de aceptación de la instalación
 

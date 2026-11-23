@@ -1,13 +1,14 @@
 # API_CONTRACT — Contrato REST /api/v1 (Fase 3)
 
 > Base: `http://<lba-host>:8000/api/v1` · OpenAPI interactiva autogenerada: `http://<lba-host>:8000/docs` (Swagger) y `/redoc`.
+> Estas URLs HTTP son para desarrollo/loopback o una LAN aislada protegida; TLS interno, cookies `Secure` y terminación HTTPS aún son gates pendientes. No publicar el servicio en una red no confiable.
 > Autenticación: `Authorization: Bearer <token>` (o cabecera `X-API-Token`). Ver `SECURITY.md` (tokens de un solo uso visual, almacenados con hash, IP allowlist, rate limit).
 
 ## 1. Endpoints
 
 | Método | Ruta | Descripción | Auth |
 |---|---|---|---|
-| GET | `/health` | Estado del servidor (versión, BD, cola, uptime) | no |
+| GET | `/health` | Estado, nombre de la app, versión y uptime; sin inventario/actividad | no |
 | GET | `/stats` | Contadores de cola/historial/errores | token |
 | GET | `/printers` | Listado de impresoras | token |
 | POST | `/printers` | Alta manual de impresora (IP/puerto) | token |
@@ -24,7 +25,7 @@
 | POST | `/jobs/{id}/reprint` | Reimprimir (nuevo job, mismo payload) | token |
 | POST | `/jobs/{id}/cancel` | Cancelar si está pendiente | token |
 
-Errores estándar: `400` payload inválido · `401` sin token · `403` IP no autorizada / token inválido · `404` no existe · `409` `idempotency_key` duplicada (el trabajo existente está en `detail.job`) · `413` payload demasiado grande · `429` rate limit.
+Errores estándar: `400` error de solicitud explícito · `401` falta/token inválido · `403` IP no autorizada · `404` no existe · `409` `idempotency_key` reutilizada (el trabajo existente está en `detail.job`; igualdad requiere misma impresora y payload canónico) · `413` payload demasiado grande · `422` validación Pydantic · `429` rate limit. La respuesta pública `/health` no incluye conteos ni inventario; `GET /stats` exige token.
 
 ## 2. Objeto `Printer`
 

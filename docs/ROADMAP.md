@@ -2,6 +2,12 @@
 
 > Regla del encargo nº 11: antes de cada fase se documentan objetivos y criterios de aceptación; al terminar, archivos creados, pruebas y pendientes (eso se registra en `CHANGELOG.md`).
 
+## Auditoría de estabilización — 2026-11-23 (QA local, no release)
+
+La reevaluación local más reciente ejecutó **60 tests del servidor**, **22 pruebas de despliegue** aisladas con mocks/temporales y los **2 archivos Node** del addon; la corrección de restore, guard de creación ORM para POS/manager, ACL de departamentos, validación de 409 con estado explícito, readiness, reimpresión archivada, idempotencia SQLite y claim/evento se documenta con evidencia en `FINAL_AUDIT.md`. Los scripts no se instalaron en LXC/systemd real y Odoo TransactionCase/OWL no se ejecutaron para este árbol. Los workflows ahora incluyen la suite deploy y ambos archivos Node, pero esa revisión de CI aún no se ha ejecutado.
+
+**No declarar versión estable ni integrar en `main`** hasta cerrar: CI de la revisión actual, TransactionCase en Odoo 19/PostgreSQL, instalación Debian 12/LXC con systemd, navegador OWL/TPV y E2E Odoo→LBA→simulador, estrés multiproceso, validación de HTTPS/cookie, build reproducible y hashes del SHA probado, más gates físicos autorizados. La identidad criptográfica de plantillas Proxmox locales, reconciliación de CTID existente, dependencias con lock/hash, matriz de plataformas, renderer `profile`/`density`, TLS y release estable siguen pendientes.
+
 ## Fase 0 — Investigación obligatoria ✅ HECHA
 
 **Objetivos**: inspeccionar Odoo 19 real, python-escpos, impresoras y protocolos; producir los 8 documentos.
