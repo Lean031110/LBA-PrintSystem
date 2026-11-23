@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 """Tests de la cola de salida lba.print.job (HTTP mockeado)."""
 import json
+import uuid
 from unittest.mock import MagicMock, patch
+
+from psycopg2 import IntegrityError
 
 from odoo.exceptions import ValidationError
 from odoo.tests.common import TransactionCase
@@ -19,12 +22,14 @@ def _resp(status=200, payload=None):
 class TestLbaJob(TransactionCase):
     def _job(self, kind="kitchen", key="odoo:t:1", blocks=None):
         server = self.env["lba.print.server"].create({
-            "name": "S", "base_url": "http://127.0.0.1", "port": 8000,
+            "name": f"S-{uuid.uuid4()}",
+            "base_url": "http://127.0.0.1", "port": 8000,
             "api_token": "tok"})
         printer = self.env["lba.print.printer"].create({
             "server_id": server.id, "external_id": "p-1", "name": "Cocina"})
         payload = {"type": "ticket",
-                   "blocks": blocks or [{"type": "text", "value": "ñá"}]}
+                   "blocks": ([{"type": "text", "value": "ñá"}]
+                              if blocks is None else blocks)}
         return self.env["lba.print.job"].create({
             "printer_id": printer.id, "kind": kind,
             "payload_json": json.dumps(payload),
@@ -90,7 +95,7 @@ class TestLbaJob(TransactionCase):
 
     def test_clave_idempotente_unica(self):
         self._job(key="odoo:t:5")
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(IntegrityError), self.cr.savepoint():
             self._job(key="odoo:t:5")
 
     def test_clave_fuera_del_alfabeto_del_servidor_rechazada(self):

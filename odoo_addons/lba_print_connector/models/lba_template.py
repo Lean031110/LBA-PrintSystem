@@ -496,23 +496,18 @@ class LbaPrintTemplateBlock(models.Model):
                     _("El tamaño de texto solo admite 1 o 2 "
                       "(doble ancho/alto)."))
 
-    @api.constrains("block_ids")
-    def _check_block_count(self):
-        for template in self:
-            if len(template.block_ids) > MAX_BLOCKS:
-                raise ValidationError(_(
-                    "La plantilla no puede tener más de %d bloques "
-                    "(tiene %d).") % (MAX_BLOCKS, len(template.block_ids)))
-
     @api.constrains("template_id")
     def _check_template_block_count(self):
         """Límite también al crear bloques directamente (diseñador/datos)."""
         for block in self:
             template = block.template_id
-            if template and len(template.block_ids) > MAX_BLOCKS:
+            if not template:
+                continue
+            count = self.search_count([("template_id", "=", template.id)])
+            if count > MAX_BLOCKS:
                 raise ValidationError(_(
                     "La plantilla no puede tener más de %d bloques "
-                    "(tiene %d).") % (MAX_BLOCKS, len(template.block_ids)))
+                    "(tiene %d).") % (MAX_BLOCKS, count))
 
     # ------------------------------------------------------------- serializador
 

@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 """Tests de departamentos iniciales y personalizados."""
+from psycopg2 import IntegrityError
+
 from odoo.exceptions import ValidationError
 from odoo.tests.common import TransactionCase
 
@@ -15,7 +17,7 @@ class TestDepartments(TransactionCase):
             "name": "Postres", "code": "postres"})
         self.assertTrue(dept.active)
         # código duplicado → constraint
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(IntegrityError), self.cr.savepoint():
             self.env["lba.print.department"].create({
                 "name": "Postres 2", "code": "postres"})
 
