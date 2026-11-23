@@ -31,6 +31,7 @@ export const LBA_FIELD_WHITELIST = [
 export const LBA_TABLE_WHITELIST = [
     "lines.new",
     "lines.cancelled",
+    "lines.noteUpdate",
     "lines.all",
     "payments.list",
 ];
@@ -138,7 +139,7 @@ function tableRows(tableKey, data) {
  */
 export function templateToDocument(template, data) {
     const out = [];
-    const blocks = template?.blocks || [];
+    const blocks = template?.blocks || template?.block_ids || [];
     for (const block of blocks) {
         emitBlock(block, data, out);
     }
@@ -191,7 +192,7 @@ function emitBlock(block, data, out) {
             break;
         case "conditional":
             if (conditionValue(block.condition_key, data)) {
-                for (const child of block.children || []) {
+                for (const child of block.children || block.child_ids || []) {
                     emitBlock(child, data, out);
                 }
             }
@@ -204,23 +205,125 @@ function emitBlock(block, data, out) {
     }
 }
 
-/**
- * Clave de idempotencia del TPV (espejo del controlador
- * controllers/main.py::_build_key): op_id SEMÁNTICO por tipo de acción.
- */
-export function buildIdempotencyOpId(kind, order, options = {}) {
-    switch (kind) {
-        case "receipt":
-            return `${order?.uuid || "na"}:${options.bill ? "bill" : "payment"}`;
-        case "kitchen":
-        case "delta": {
-            const seq = options.changeSeq || 0;
-            return `${order?.uuid || "na"}:change:${seq}`;
-        }
-        case "reprint":
-        case "test":
-            return crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`;
-        default:
-            return `${order?.uuid || "na"}:${kind}`;
+function lineData(line) {
+    return {
+        qty: line?.quantity ?? line?.getQuantity?.() ?? "",
+        name: line?.getFullProductName?.() || line?.full_product_name ||
+            line?.product_id?.display_name || line?.product_id?.name || line?.name || "",
+        price: line?.currencyDisplayPriceIncl ?? "",
+        note: line?.customer_note || line?.note || "",
+    };
+}
+
+/** Contrato común del diseñador, relleno con un pedido POS real. */
+export function receiptTemplateData(order, options = {}) {
+    const lines = order?.lines || order?.orderlines || [];
+    const payments = order?.paymentlines || [];
+    const table = order?.table_id?.name || "";
+    const note = order?.general_customer_note || "";
+    const change = order?.change ?? "";
+    return {
+        company: {
+            name: order?.company?.name || "",
+            address: order?.company?.contact_address || order?.company?.street || "",
+        },
+        order: {
+            ref: order?.getName?.() || order?.preparationName || order?.uuid || "",
+            cashier: order?.getCashierName?.() || "",
+            table,
+            customer_count: order?.customer_count || "",
+            datetime: order?.date_order || "",
+            subtotal: order?.getTotalWithoutTax?.() ?? "",
+            discount: order?.getTotalDiscount?.() ?? "",
+            total: order?.currencyDisplayPriceIncl ?? order?.getTotalWithTax?.() ?? "",
+            change,
+            note,
+            has_table: Boolean(table),
+            has_note: Boolean(note),
+            has_change: Boolean(change && Number(change) !== 0),
+            has_payments: payments.length > 0,
+            is_bill: Boolean(options.bill),
+            is_reprint: Boolean(options.reprint),
+            has_cancelled: false,
+        },
+        department: { name: options.departmentName || "" },
+        payments: payments.map((payment) => ({
+            name: payment?.payment_method_id?.name || payment?.name || "",
+            amount: payment?.currencyDisplayAmountIncl ?? payment?.amount ?? "",
+        })),
+        lines: { all: lines.map(lineData), new: [], cancelled: [] },
+    };
+}
+
+/** Datos del delta producido por generateOrderChange del core Odoo. */
+export function kitchenTemplateData(order, orderData, changes, options = {}) {
+    const data = receiptTemplateData(order, options);
+    const newLines = (changes?.new || []).map(lineData);
+    const cancelled = (changes?.cancelled || []).map((line) => {
+        const item = lineData(line);
+        return { ...item, qty: Math.abs(Number(item.qty) || 0) };
+    });
+    const noteUpdate = (changes?.noteUpdate || []).map(lineData);
+    data.order.ref = orderData?.pos_reference || data.order.ref;
+    data.order.cashier = orderData?.employee_name || data.order.cashier;
+    data.order.datetime = orderData?.time || data.order.datetime;
+    data.order.note = orderData?.general_customer_note || data.order.note;
+    data.order.has_note = Boolean(data.order.note || orderData?.internal_note);
+    data.order.has_cancelled = cancelled.length > 0;
+    data.lines = {
+        new: newLines,
+        cancelled,
+        noteUpdate,
+        all: [...newLines, ...cancelled, ...noteUpdate],
+    };
+    return data;
+}
+
+let operationFallbackSequence = 0;
+
+export function newOperationId() {
+    if (globalThis.crypto?.randomUUID) {
+        return globalThis.crypto.randomUUID();
     }
+    operationFallbackSequence += 1;
+    return `${Date.now().toString(36)}-${operationFallbackSequence.toString(36)}`;
+}
+
+function stableHash(value) {
+    let a = 2166136261;
+    let b = 2246822519;
+    for (let i = 0; i < value.length; i++) {
+        const code = value.charCodeAt(i);
+        a = Math.imul(a ^ code, 16777619);
+        b = Math.imul(b ^ (code + i), 3266489917);
+    }
+    return `${(a >>> 0).toString(36)}${(b >>> 0).toString(36)}`;
+}
+
+/** ID determinista para el mismo delta; el alcance separa destino/evento. */
+export function buildKitchenEventId(order, change, slot) {
+    const lineSignature = (lines) => (lines || []).map((line) => [
+        line?.uuid || line?.preparationKey || line?.product_id?.id || line?.name || "",
+        line?.quantity ?? line?.qty ?? "",
+        line?.note || "",
+        line?.customer_note || "",
+    ]);
+    const source = JSON.stringify({
+        base: order?.last_order_preparation_change?.metadata?.serverDate || "initial",
+        slot,
+        new: lineSignature(change?.new),
+        cancelled: lineSignature(change?.cancelled),
+        noteUpdate: lineSignature(change?.noteUpdate),
+        internal: change?.internal_note || "",
+        general: change?.general_customer_note || "",
+    });
+    return `evt-${stableHash(source)}`;
+}
+
+/** La misma operationId se reutiliza en retries; la reimpresión recibe otra. */
+export function buildIdempotencyOpId(kind, order, options = {}) {
+    const orderId = String(order?.uuid || "na").slice(0, 96);
+    const eventId = String(options.eventId || newOperationId()).slice(0, 72);
+    const scope = options.scope ? `:${String(options.scope).slice(0, 24)}` : "";
+    return `lba:${orderId}:${kind}:${eventId}${scope}`.slice(0, 200);
 }

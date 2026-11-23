@@ -17,6 +17,7 @@ from odoo.exceptions import ValidationError
 class LbaPrintDepartment(models.Model):
     _name = "lba.print.department"
     _description = "Departamento de impresión LBA"
+    _inherit = ["pos.load.mixin"]
     _order = "sequence, id"
 
     name = fields.Char(required=True, translate=True)
@@ -73,10 +74,17 @@ class LbaPrintDepartment(models.Model):
         """
         for dept in self.filtered("active"):
             for cat in dept.category_ids:
+                related = self.env["pos.category"].search([
+                    ("id", "child_of", cat.id),
+                ])
+                parent = cat.parent_id
+                while parent:
+                    related |= parent
+                    parent = parent.parent_id
                 others = self.search([
                     ("id", "!=", dept.id),
                     ("active", "=", True),
-                    ("category_ids", "in", cat.id),
+                    ("category_ids", "in", related.ids),
                 ])
                 if others:
                     raise ValidationError(_(
@@ -125,3 +133,13 @@ class LbaPrintDepartment(models.Model):
             return self.env["lba.print.printer"].browse()
         self.ensure_one()
         return self.printer_ids.filtered(lambda p: p.active)[:1]
+
+    @api.model
+    def _load_pos_data_domain(self, data, config):
+        return [("active", "=", True),
+                ("printer_ids.server_id.company_id", "=", config.company_id.id)]
+
+    @api.model
+    def _load_pos_data_fields(self, config):
+        return ["id", "name", "code", "printer_ids", "category_ids",
+                "is_fallback", "active"]

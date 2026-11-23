@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 """Impresoras sincronizadas desde el LBA Print Server."""
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class LbaPrintPrinter(models.Model):
     _name = "lba.print.printer"
     _description = "Impresora LBA (sincronizada desde el servidor)"
+    _inherit = ["pos.load.mixin"]
     _order = "name, id"
     _rec_names_search = "name,external_id,ip"
 
@@ -39,6 +40,12 @@ class LbaPrintPrinter(models.Model):
     )
 
     def _load_pos_data_fields(self, config):
-        # pos.load.mixin: exponer el id en el frontend del TPV
-        res = super()._load_pos_data_fields(config)
-        return res
+        return ["id", "name", "external_id", "server_id", "active",
+                "department_ids", "paper_width_mm", "columns"]
+
+    @api.model
+    def _load_pos_data_domain(self, data, config):
+        receipt_id = config.lba_receipt_printer_id.id or 0
+        return ["&", ("active", "=", True), "|",
+                ("server_id.company_id", "=", config.company_id.id),
+                ("id", "=", receipt_id)]

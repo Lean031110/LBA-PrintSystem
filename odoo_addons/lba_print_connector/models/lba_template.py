@@ -44,6 +44,7 @@ FIELD_WHITELIST = [
 TABLE_WHITELIST = [
     ("lines.new", "Líneas · Nuevas (comanda)"),
     ("lines.cancelled", "Líneas · Canceladas (comanda)"),
+    ("lines.noteUpdate", "Líneas · Notas modificadas (comanda)"),
     ("lines.all", "Líneas · Todas (recibo)"),
     ("payments.list", "Pagos · Métodos e importes"),
 ]
@@ -125,6 +126,7 @@ def default_blocks_kitchen():
         {"block_type": "ruler", "ruler_char": "="},
         {"block_type": "table", "table_key": "lines.new"},
         {"block_type": "table", "table_key": "lines.cancelled"},
+        {"block_type": "table", "table_key": "lines.noteUpdate"},
         {"block_type": "feed", "feed_lines": 2},
         {"block_type": "cut", "cut_feed_before": 0},
     ]
@@ -188,6 +190,7 @@ def sample_ticket_data(kind="receipt"):
 class LbaPrintTemplate(models.Model):
     _name = "lba.print.template"
     _description = "Plantilla de impresión LBA"
+    _inherit = ["pos.load.mixin"]
     _order = "template_type, sequence, priority, id"
 
     name = fields.Char(required=True, translate=True)
@@ -233,6 +236,15 @@ class LbaPrintTemplate(models.Model):
         "unique(name, company_id)",
         "Ya existe una plantilla con ese nombre",
     )
+
+    @api.model
+    def _load_pos_data_domain(self, data, config):
+        return [("active", "=", True), ("company_id", "=", config.company_id.id)]
+
+    @api.model
+    def _load_pos_data_fields(self, config):
+        return ["id", "name", "template_type", "department_id", "printer_id",
+                "priority", "sequence", "width_mm", "columns", "block_ids"]
 
     @api.depends("printer_id.paper_width_mm", "printer_id.columns",
                  "department_id.printer_ids.paper_width_mm",
@@ -375,6 +387,7 @@ class LbaPrintTemplate(models.Model):
 class LbaPrintTemplateBlock(models.Model):
     _name = "lba.print.template.block"
     _description = "Bloque de plantilla de impresión LBA"
+    _inherit = ["pos.load.mixin"]
     _order = "template_id, sequence, id"
 
     template_id = fields.Many2one(
@@ -568,6 +581,21 @@ class LbaPrintTemplateBlock(models.Model):
             return out
         return []
 
+    @api.model
+    def _load_pos_data_domain(self, data, config):
+        template_ids = [row["id"] for row in data.get("lba.print.template", [])]
+        return [("template_id", "in", template_ids)] if template_ids else [
+            ("id", "=", 0),
+        ]
+
+    @api.model
+    def _load_pos_data_fields(self, config):
+        return ["id", "template_id", "parent_id", "child_ids", "sequence",
+                "block_type", "align", "bold", "size_width", "size_height",
+                "value_text", "field_key", "value_origin", "ruler_char",
+                "spacer_lines", "feed_lines", "cut_feed_before", "qr_size",
+                "symbology", "image", "condition_key", "table_key"]
+
 
 def _lookup(data, *keys, default=""):
     node = data
@@ -604,7 +632,8 @@ def _condition_value(condition_key, data):
 def _table_rows(table_key, data):
     """Filas formateadas de líneas/pagos para bloques tabla (55-58mm)."""
     rows = []
-    if table_key in ("lines.new", "lines.cancelled", "lines.all"):
+    if table_key in ("lines.new", "lines.cancelled", "lines.noteUpdate",
+                     "lines.all"):
         source = _lookup(data, "lines", table_key.split(".", 1)[1],
                          default=[]) or []
         for line in source:
