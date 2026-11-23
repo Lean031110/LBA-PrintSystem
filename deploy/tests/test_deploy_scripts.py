@@ -4,7 +4,9 @@ import importlib.util
 import io
 import json
 import os
+import grp
 from pathlib import Path
+import pwd
 import shutil
 import sqlite3
 import subprocess
@@ -343,7 +345,7 @@ exec /usr/bin/mv \"$@\"
             yield directory
         finally:
             subprocess.run(
-                [self.sudo, "-n", "chown", "-R", "ubuntu:ubuntu", str(directory)],
+                [self.sudo, "-n", "chown", "-R", f"{os.getuid()}:{os.getgid()}", str(directory)],
                 check=True, capture_output=True, text=True, timeout=10,
             )
             shutil.rmtree(directory)
@@ -385,8 +387,8 @@ exec /usr/bin/mv \"$@\"
             "LBA_RESTORE_VAR_DIR": str(var_dir),
             "LBA_RESTORE_ENV_DIR": str(env_dir),
             "LBA_RESTORE_STAGE_ROOT": str(base / "stage"),
-            "LBA_SERVICE_USER": "ubuntu",
-            "LBA_SERVICE_GROUP": "ubuntu",
+            "LBA_SERVICE_USER": pwd.getpwuid(os.getuid()).pw_name,
+            "LBA_SERVICE_GROUP": grp.getgrgid(os.getgid()).gr_name,
             "MOCK_SYSTEMCTL_LOG": str(base / "systemctl.log"),
             "MOCK_CURL_LOG": str(base / "curl.log"),
         }

@@ -32,12 +32,15 @@ jobs:
       PGPORT: 5432
       PGUSER: odoo
       PGPASSWORD: odoo
-      ODOO_ROOT: ${{ runner.temp }}/odoo
-      ODOO_ADDONS: ${{ runner.temp }}/odoo/addons,odoo_addons
       ODOO_COMMIT: 62c2f793058de87ff453532f206a96a1e71845d2
     steps:
       - name: Checkout LBA Print System
         uses: actions/checkout@v4
+
+      - name: Configurar rutas temporales de Odoo
+        run: |
+          echo "ODOO_ROOT=${RUNNER_TEMP}/odoo" >> "$GITHUB_ENV"
+          echo "ODOO_ADDONS=${RUNNER_TEMP}/odoo/addons,${GITHUB_WORKSPACE}/odoo_addons" >> "$GITHUB_ENV"
 
       - name: Configurar Python compatible con Odoo 19
         uses: actions/setup-python@v5
