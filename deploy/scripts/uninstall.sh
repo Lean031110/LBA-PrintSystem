@@ -1,20 +1,31 @@
 #!/usr/bin/env bash
 # Desinstalación limpia del LBA Print Server.
-# Uso: bash uninstall.sh [--purge-data]   (sin --purge-data conserva /var/lib/lba)
+# Por defecto conserva /var/lib/lba y /etc/lba-print; --purge-data borra ambos.
 set -euo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib_common.sh"
+lba_require_root
 PURGE="${1:-}"
+INSTALL_DIR="${LBA_INSTALL_DIR:-/opt/lba}"
+VAR_DIR="${LBA_UNINSTALL_VAR_DIR:-/var/lib/lba}"
+ENV_DIR="${LBA_UNINSTALL_ENV_DIR:-/etc/lba-print}"
+SYSTEMD_DIR="${LBA_SYSTEMD_DIR:-/etc/systemd/system}"
+if [[ "$PURGE" != "" && "$PURGE" != "--purge-data" ]]; then
+    lba_die "uso: uninstall.sh [--purge-data]"
+fi
 
 systemctl disable --now lba-print-api.service lba-print-worker.service \
     lba-print-simulator.service 2>/dev/null || true
-rm -f /etc/systemd/system/lba-print-{api,worker,simulator}.service
+rm -f "$SYSTEMD_DIR/lba-print-api.service" \
+      "$SYSTEMD_DIR/lba-print-worker.service" \
+      "$SYSTEMD_DIR/lba-print-simulator.service"
 systemctl daemon-reload
+rm -rf -- "$INSTALL_DIR"
 
-if [ "$PURGE" = "--purge-data" ]; then
-    rm -rf /var/lib/lba /etc/lba-print /opt/lba
-    echo "Eliminados /opt/lba, /var/lib/lba y /etc/lba-print (incluida la BD)."
+if [[ "$PURGE" == "--purge-data" ]]; then
+    rm -rf -- "$VAR_DIR" "$ENV_DIR"
+    echo "Eliminados $INSTALL_DIR, $VAR_DIR y $ENV_DIR (incluida la BD/configuración)."
 else
-    rm -rf /opt/lba /etc/lba-print
-    echo "Conservado /var/lib/lba (BD, cola e historial). Reinstala con"
-    echo "install.sh para recuperar el servicio con sus datos."
+    echo "Conservados $VAR_DIR (BD/cola/historial) y $ENV_DIR (configuración/secretos)."
+    echo "Reinstala con install.sh para recuperar el servicio con sus datos y configuración."
 fi
-echo "Usuario 'lba' conservado (id del sistema sin shell). userdel lba si quieres."
+echo "Usuario 'lba' conservado (id del sistema sin shell); elimínalo manualmente solo si ya no se necesita."

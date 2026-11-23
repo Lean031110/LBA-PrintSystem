@@ -10,13 +10,40 @@ BRIDGE="${BRIDGE:-vmbr0}"
 STORAGE="${STORAGE:-local-lvm}"
 IP="${IP:-dhcp}"     # o "192.168.1.50/24,gw=192.168.1.1"
 TEMPLATE="${TEMPLATE:-debian-12-standard_amd64.tar.zst}"
+TEMPLATE_STORAGE="${TEMPLATE_STORAGE:-local}"
+
+for command_name in pveam pvesm pct; do
+  command -v "$command_name" >/dev/null 2>&1 || {
+    echo "ERROR: falta el comando Proxmox requerido: $command_name (ejecutar en el host PVE)." >&2
+    exit 2
+  }
+done
+[[ "$CTID" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: CTID debe ser un entero positivo." >&2; exit 2; }
+
+# Fallar con un diagnóstico no destructivo en vez de intentar crear o modificar
+# un contenedor preexistente con identidad potencialmente distinta.
+if pct config "$CTID" >/dev/null 2>&1; then
+  echo "ERROR: CTID $CTID ya existe; no se modificó. Elija otro CTID o revise el CT existente manualmente." >&2
+  exit 2
+fi
 
 echo "== Plantilla Debian 12 =="
-pveam update
-pveam download local "$TEMPLATE" 2>/dev/null || true   # ya descargada → ok
+TEMPLATE_VOLID="${TEMPLATE_STORAGE}:vztmpl/${TEMPLATE}"
+TEMPLATE_PATH="$(pvesm path "$TEMPLATE_VOLID" 2>/dev/null || true)"
+if [[ -n "$TEMPLATE_PATH" && -f "$TEMPLATE_PATH" ]]; then
+  echo "Usando plantilla local existente: $TEMPLATE_VOLID"
+else
+  pveam update
+  pveam download "$TEMPLATE_STORAGE" "$TEMPLATE"
+  TEMPLATE_PATH="$(pvesm path "$TEMPLATE_VOLID")"
+  [[ -n "$TEMPLATE_PATH" && -f "$TEMPLATE_PATH" ]] || {
+    echo "ERROR: la plantilla no aparece en el almacenamiento tras la descarga: $TEMPLATE_VOLID" >&2
+    exit 1
+  }
+fi
 
 echo "== Crear CT $CTID (unprivileged) =="
-pct create "$CTID" "local:vztmpl/$TEMPLATE" \
+pct create "$CTID" "$TEMPLATE_VOLID" \
   --hostname "$HOSTNAME" \
   --unprivileged 1 \
   --cores 1 --memory 1024 --swap 512 \
