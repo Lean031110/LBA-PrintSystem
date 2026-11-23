@@ -36,6 +36,14 @@ assert.equal(ticket.blocks[2].value, "1 x Café");
 assert.equal(ticket.blocks[3].value, "   » sin azúcar");
 assert.equal(ticket.blocks[4].value, "NOTA");
 assert.throws(() => templateToDocument({ blocks: [] }, {}), /no produce bloques/);
+const spacing = templateToDocument({ blocks: [
+    { block_type: "spacer", spacer_lines: 4, feed_lines: 2 },
+    { block_type: "feed", spacer_lines: 4, feed_lines: 2 },
+] }, {});
+assert.deepEqual(spacing.blocks, [
+    { type: "feed", lines: 4 },
+    { type: "feed", lines: 2 },
+]);
 
 const order = {
     uuid: "order-0001",

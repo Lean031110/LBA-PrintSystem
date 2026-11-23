@@ -11,7 +11,7 @@ import uuid as uuidlib
 from datetime import timedelta
 
 from odoo import _, api, fields, models
-from odoo.exceptions import ValidationError
+from odoo.exceptions import AccessError, ValidationError
 
 _logger = logging.getLogger(__name__)
 
@@ -73,6 +73,15 @@ class LbaPrintJob(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        # POS users and managers may read their queue, but jobs must be created
+        # through the controller that validates the open session, config and
+        # printer. The controller calls sudo() only after that validation;
+        # RPC callers cannot set env.su through a request context.
+        is_pos_user = self.env.user.has_group("point_of_sale.group_pos_user")
+        is_pos_manager = self.env.user.has_group("point_of_sale.group_pos_manager")
+        if not self.env.su and (is_pos_user or is_pos_manager):
+            raise AccessError(_(
+                "Los trabajos TPV deben crearse mediante una sesión POS autorizada"))
         for vals in vals_list:
             if not vals.get("uuid"):
                 vals["uuid"] = str(uuidlib.uuid4())
@@ -190,14 +199,25 @@ class LbaPrintJob(models.Model):
         return True
 
     def action_process_now(self):
-        return self._cron_process_pending()
+        self._check_pos_manager()
+        # This public button may process only the records selected by the
+        # manager. The global queue remains exclusively in the private cron.
+        for job in self.filtered(lambda item: item.state == "pending"):
+            job._post_job()
+        return True
+
+    def _check_pos_manager(self):
+        if not self.env.user.has_group("point_of_sale.group_pos_manager"):
+            raise AccessError(_("Solo los responsables del TPV pueden operar la cola LBA"))
 
     def action_cancel(self):
+        self._check_pos_manager()
         self.filtered(lambda j: j.state == "pending").write(
             {"state": "cancelled"})
         return True
 
     def action_retry(self):
+        self._check_pos_manager()
         self.filtered(lambda j: j.state == "failed").write({
             "state": "pending", "attempts": 0, "next_attempt":
                 fields.Datetime.now(), "last_error": False})

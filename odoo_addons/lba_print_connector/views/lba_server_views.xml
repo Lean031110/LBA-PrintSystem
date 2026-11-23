@@ -27,9 +27,11 @@
                 <header>
                     <button name="action_test_connection" type="object"
                             string="Probar conexión"
+                            groups="base.group_system"
                             class="btn-primary" icon="fa-plug"/>
                     <button name="action_sync_printers" type="object"
                             string="Sincronizar impresoras"
+                            groups="base.group_system"
                             icon="fa-refresh"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="draft,online,offline"/>

@@ -165,8 +165,10 @@ function emitBlock(block, data, out) {
             out.push({ type: "ruler", char: "=" });
             break;
         case "spacer":
+            out.push({ type: "feed", lines: Math.max(1, block.spacer_lines || 1) });
+            break;
         case "feed":
-            out.push({ type: "feed", lines: Math.max(1, block.feed_lines || block.spacer_lines || 1) });
+            out.push({ type: "feed", lines: Math.max(1, block.feed_lines || 1) });
             break;
         case "cut":
             out.push({ type: "cut", feed_before: Math.max(0, block.cut_feed_before || 0) });

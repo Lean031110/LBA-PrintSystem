@@ -7,6 +7,7 @@ import { rpc } from "@web/core/network/rpc";
 import { _t } from "@web/core/l10n/translation";
 import { PosStore } from "@point_of_sale/app/services/pos_store";
 import { buildKitchenDocument, buildReceiptDocument } from "./lba_payload";
+import { canFailoverPrinter } from "./lba_routing";
 import {
     buildKitchenEventId,
     buildIdempotencyOpId,
@@ -243,6 +244,8 @@ patch(PosStore.prototype, {
                 })
             );
             const result = await rpc("/lba_print/jobs", {
+                config_id: recordId(cfg),
+                session_id: recordId(this.session),
                 printer_id: printerId,
                 kind: "receipt",
                 order_ref: order.getName?.() || order.preparationName || order.uuid,
@@ -312,6 +315,9 @@ patch(PosStore.prototype, {
 
         for (const department of lbaDepartments) {
             const printerRefs = relationRows(department.printer_ids);
+            const eligiblePrinterRefs = printerRefs.filter((printerRef) =>
+                activePrinters.has(recordId(printerRef))
+            );
             const categoryIds = relationRows(department.category_ids)
                 .map(recordId).filter(Boolean);
             const isFallback = Boolean(department.is_fallback);
@@ -319,12 +325,18 @@ patch(PosStore.prototype, {
                 continue;
             }
 
-            for (const printerRef of printerRefs) {
+            // printer_ids is ordered by lba.print.printer (_order=name,id):
+            // first active printer is primary; later entries are fallbacks.
+            const outcomes = new Map();
+            for (let printerIndex = 0; printerIndex < eligiblePrinterRefs.length; printerIndex++) {
+                const printerRef = eligiblePrinterRefs[printerIndex];
                 const printerId = recordId(printerRef);
                 const printer = activePrinters.get(printerId);
-                if (!printer) continue;
+                const hasMorePrinters = printerIndex + 1 < eligiblePrinterRefs.length;
 
                 for (let changeIndex = 0; changeIndex < (orderChange || []).length; changeIndex++) {
+                    const outcome = outcomes.get(changeIndex);
+                    if (outcome === "accepted" || outcome === "terminal") continue;
                     const sourceChange = orderChange[changeIndex];
                     const scopedChange = {
                         ...sourceChange,
@@ -384,6 +396,8 @@ patch(PosStore.prototype, {
 
                     try {
                         const result = await rpc("/lba_print/jobs", {
+                            config_id: recordId(cfg),
+                            session_id: recordId(this.session),
                             printer_id: printerId,
                             kind: reprint ? "reprint" : deltaKind,
                             order_ref: orderData?.pos_reference || order?.preparationName || order?.uuid,
@@ -394,12 +408,22 @@ patch(PosStore.prototype, {
                         });
                         if (isAccepted(result)) {
                             isPrinted = true;
+                            outcomes.set(changeIndex, "accepted");
+                        } else if (canFailoverPrinter(result, hasMorePrinters)) {
+                            // The controller rejected this destination before
+                            // creating a job; only this explicit case can fall
+                            // through to the next configured printer.
+                            outcomes.set(changeIndex, "fallback");
                         } else {
+                            outcomes.set(changeIndex, "terminal");
                             allLbaAccepted = false;
                             notifyError(this, printer.name, result?.error || _t("respuesta de cola inválida"));
                         }
                     } catch (error) {
                         // El mismo objeto de cambio conserva su operationId para retry.
+                        // A timeout the server may already have accepted the job;
+                        // stop here rather than risk a duplicate on a backup.
+                        outcomes.set(changeIndex, "terminal");
                         allLbaAccepted = false;
                         notifyError(this, printer.name, error?.message || error);
                     }

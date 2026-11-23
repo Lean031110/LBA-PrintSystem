@@ -78,6 +78,8 @@ class LbaPrintServer(models.Model):
     # ---------------------------------------------------------------- acciones
 
     def action_test_connection(self):
+        self.check_access_rights("write")
+        self.check_access_rule("write")
         for server in self:
             try:
                 resp = server._request("GET", "/health")
@@ -85,9 +87,8 @@ class LbaPrintServer(models.Model):
                 server.write({
                     "state": "online" if resp.status_code == 200 else "offline",
                     "last_check": fields.Datetime.now(),
-                    "last_message": _("OK · %s v%s · %s impresoras") % (
-                        payload.get("app"), payload.get("version"),
-                        payload.get("printers")),
+                    "last_message": _("OK · %s v%s") % (
+                        payload.get("app"), payload.get("version")),
                 })
             except Exception as exc:  # requests/JSON/timeout
                 server.write({
@@ -100,6 +101,8 @@ class LbaPrintServer(models.Model):
 
     def action_sync_printers(self):
         """GET /printers → réplica local lba.print.printer."""
+        self.check_access_rights("write")
+        self.check_access_rule("write")
         for server in self:
             try:
                 resp = server._request("GET", "/printers")
@@ -175,7 +178,8 @@ class LbaPrintServer(models.Model):
                     return True, resp.json()
                 if resp.status_code == 409:
                     current = server.lba_get_job(job.external_job_id) or {}
-                    if current.get("status") in ("pending", "processing", "sent"):
+                    if current.get("status") in (
+                            "pending", "processing", "sent", "failed", "cancelled"):
                         return True, current
                 return False, f"HTTP {resp.status_code}: {resp.text[:200]}"
             resp = server._request("POST", "/jobs", json=body)
@@ -184,9 +188,22 @@ class LbaPrintServer(models.Model):
                 return True, data
             if resp.status_code == 409:
                 # idempotencia: el servidor ya lo tiene (por un reintento previo)
-                data = resp.json().get("detail", {}).get("job", {})
+                payload = resp.json() or {}
+                detail = payload.get("detail") or {}
+                data = detail.get("job", {}) if isinstance(detail, dict) else {}
+                valid_statuses = {
+                    "pending", "processing", "sent", "failed", "cancelled"}
+                remote_status = data.get("status") if isinstance(data, dict) else None
+                if not isinstance(data, dict) or \
+                        not isinstance(data.get("id"), str) or \
+                        not data["id"].strip() or \
+                        not isinstance(remote_status, str) or \
+                        remote_status not in valid_statuses:
+                    return False, f"HTTP 409 sin trabajo remoto identificable: {resp.text[:200]}"
                 if data.get("status") == "failed":
-                    return False, "El trabajo remoto falló; reintentar su ID existente"
+                    # Persistir el ID y el estado fallido permite que
+                    # action_retry use /jobs/{id}/retry, sin POST duplicado.
+                    return True, data
                 return True, data
             return False, f"HTTP {resp.status_code}: {resp.text[:200]}"
         except Exception as exc:

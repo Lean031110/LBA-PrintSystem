@@ -1,12 +1,34 @@
 # -*- coding: utf-8 -*-
 """Tests de departamentos iniciales y personalizados."""
+import uuid
+
 from psycopg2 import IntegrityError
 
-from odoo.exceptions import ValidationError
+from odoo.exceptions import AccessError, ValidationError
 from odoo.tests.common import TransactionCase
 
 
 class TestDepartments(TransactionCase):
+    def test_solo_manager_pos_puede_editar_rutas(self):
+        department = self.env["lba.print.department"].create({
+            "name": "Departamento ACL", "code": "acl-test"})
+        base_user = self.env.ref("base.group_user").id
+        pos_user = self.env["res.users"].create({
+            "name": "LBA POS read-only",
+            "login": f"lba-pos-ro-{uuid.uuid4()}",
+            "groups_id": [(6, 0, [base_user,
+                                    self.env.ref("point_of_sale.group_pos_user").id])],
+        })
+        manager = self.env["res.users"].create({
+            "name": "LBA POS manager",
+            "login": f"lba-pos-manager-{uuid.uuid4()}",
+            "groups_id": [(6, 0, [base_user,
+                                    self.env.ref("point_of_sale.group_pos_manager").id])],
+        })
+        with self.assertRaises(AccessError):
+            department.with_user(pos_user).write({"name": "POS no debe cambiar routing"})
+        department.with_user(manager).write({"name": "Manager puede cambiar routing"})
+
     def test_departamentos_por_defecto(self):
         codes = set(self.env["lba.print.department"].search([]).mapped("code"))
         for expected in ("caja", "cocina", "pizzeria", "bar", "salon"):

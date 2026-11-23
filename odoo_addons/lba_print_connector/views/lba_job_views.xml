@@ -35,12 +35,15 @@
                 <header>
                     <button name="action_process_now" type="object"
                             string="Procesar ahora"
+                            groups="point_of_sale.group_pos_manager"
                             invisible="state != 'pending'" icon="fa-play"/>
                     <button name="action_retry" type="object"
                             string="Reintentar"
+                            groups="point_of_sale.group_pos_manager"
                             invisible="state != 'failed'" icon="fa-undo"/>
                     <button name="action_cancel" type="object"
                             string="Cancelar"
+                            groups="point_of_sale.group_pos_manager"
                             invisible="state != 'pending'" icon="fa-ban"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="pending,sent,failed"/>

@@ -8,6 +8,7 @@
               name="Servidor"
               parent="menu_lba_root"
               action="action_lba_server"
+              groups="base.group_system"
               sequence="10"/>
 
     <menuitem id="menu_lba_printer"
@@ -20,6 +21,7 @@
               name="Departamentos"
               parent="menu_lba_root"
               action="action_lba_department"
+              groups="point_of_sale.group_pos_manager,base.group_system"
               sequence="30"/>
 
     <menuitem id="menu_lba_job"
