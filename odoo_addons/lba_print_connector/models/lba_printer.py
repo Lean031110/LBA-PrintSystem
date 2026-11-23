@@ -33,10 +33,10 @@ class LbaPrintPrinter(models.Model):
     job_ids = fields.One2many("lba.print.job", "printer_id",
                               string="Trabajos")
 
-    _sql_constraints = [
-        ("server_external_uniq", "unique(server_id, external_id)",
-         "Esa impresora ya está sincronizada en este servidor"),
-    ]
+    _server_external_uniq = models.Constraint(
+        "unique(server_id, external_id)",
+        "Esa impresora ya está sincronizada en este servidor",
+    )
 
     def _load_pos_data_fields(self, config):
         # pos.load.mixin: exponer el id en el frontend del TPV

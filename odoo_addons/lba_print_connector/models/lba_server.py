@@ -42,10 +42,10 @@ class LbaPrintServer(models.Model):
                                   string="Impresoras sincronizadas")
     printer_count = fields.Integer(compute="_compute_printer_count")
 
-    _sql_constraints = [
-        ("name_company_uniq", "unique(name, company_id)",
-         "Ya existe un servidor LBA con ese nombre"),
-    ]
+    _name_company_uniq = models.Constraint(
+        "unique(name, company_id)",
+        "Ya existe un servidor LBA con ese nombre",
+    )
 
     # ------------------------------------------------------------------ helpers
 

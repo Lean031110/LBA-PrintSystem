@@ -1,32 +1,15 @@
 # -*- coding: utf-8 -*-
-"""Herencias sobre modelos del core (pos.printer, pos.config, pos.category).
+"""Herencias sobre modelos del core (pos.config).
 
 NO se modifica ningún archivo original de Odoo: solo herencia estándar.
-Campos añadidos al TPV:
-  - pos.printer.lba_printer_id: mapea cada impresora de comanda nativa con una
-    impresora LBA (las categorías siguen decidiéndose con
-    product_categories_ids nativo).
-  - pos.config.lba_active + lba_receipt_printer_id: impresión de recibos por LBA.
+
+v0.2 — enrutamiento por fuente única de verdad:
+  - Se ELIMINA pos.printer.lba_printer_id (doble fuente de verdad con
+    lba.print.department): las comandas se enrutan por
+    pos.category → lba.print.department → lba.print.printer.
+  - pos.config.lba_active + lba_receipt_printer_id: impresión de recibos LBA.
 """
 from odoo import fields, models
-
-
-class PosPrinter(models.Model):
-    _inherit = "pos.printer"
-
-    lba_printer_id = fields.Many2one(
-        "lba.print.printer", string="Impresora LBA",
-        domain=[("active", "=", True)],
-        help="Si se asigna, las comandas de esta impresora se envían por "
-             "LBA Print Server en lugar del proxy/IoT. Las categorías se "
-             "siguen definiendo arriba (Categorías de productos impresas).")
-
-    # pos.load.mixin: cargar el campo en el frontend del TPV
-    def _load_pos_data_fields(self, config):
-        fields_list = super()._load_pos_data_fields(config)
-        if "lba_printer_id" not in fields_list:
-            fields_list.append("lba_printer_id")
-        return fields_list
 
 
 class PosConfig(models.Model):
@@ -34,7 +17,8 @@ class PosConfig(models.Model):
 
     lba_active = fields.Boolean(
         "Imprimir por LBA", default=False,
-        help="Activa la impresión de recibos y comandas por LBA Print Server.")
+        help="Activa la impresión de recibos y comandas por LBA Print "
+             "Server (enrutamiento por departamentos).")
     lba_receipt_printer_id = fields.Many2one(
         "lba.print.printer", string="Impresora de recibos LBA",
         domain=[("active", "=", True)],

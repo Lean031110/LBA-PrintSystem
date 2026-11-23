@@ -48,10 +48,11 @@ class LbaPrintJob(models.Model):
     company_id = fields.Many2one("res.company",
                                  default=lambda s: s.env.company)
 
-    _sql_constraints = [
-        ("uuid_uniq", "unique(uuid)", "UUID duplicado"),
-        ("idem_uniq", "unique(idempotency_key)", "Clave idempotente duplicada"),
-    ]
+    # Odoo 19: _sql_constraints fue eliminado → objetos models.Constraint
+    _uuid_uniq = models.Constraint(
+        "unique(uuid)", "UUID duplicado")
+    _idem_uniq = models.Constraint(
+        "unique(idempotency_key)", "Clave idempotente duplicada")
 
     # ------------------------------------------------------------------ create
 

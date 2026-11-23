@@ -17,5 +17,10 @@
             <field name="model_id" ref="model_lba_print_job"/>
             <field name="domain_force">[('company_id', '=', company_id)]</field>
         </record>
+        <record id="lba_template_company_rule" model="ir.rule">
+            <field name="name">LBA template: multi-compañía</field>
+            <field name="model_id" ref="model_lba_print_template"/>
+            <field name="domain_force">[('company_id', '=', company_id)]</field>
+        </record>
     </data>
 </odoo>

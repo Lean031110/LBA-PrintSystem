@@ -16,18 +16,22 @@ con LBA Print Server (FastAPI + python-escpos) en la red local.
     "version": "19.0.1.0.0",
     "category": "Sales/Point of Sale",
     "author": "LBA",
-    "license": "MIT",
+    # El repositorio y el LICENSE del proyecto son MIT; Odoo 19 solo admite
+    # valores de su selección → MIT se declara como "Other OSI approved".
+    "license": "Other OSI approved licence",
     "depends": ["point_of_sale", "pos_restaurant"],
     "data": [
         "security/ir.model.access.csv",
         "security/lba_security.xml",
-        "views/lba_menus.xml",
         "views/lba_server_views.xml",
         "views/lba_printer_views.xml",
         "views/lba_department_views.xml",
+        "views/lba_template_views.xml",
         "views/lba_job_views.xml",
         "views/pos_config_views.xml",
+        "views/lba_menus.xml",
         "data/lba_departments.xml",
+        "data/lba_templates.xml",
         "data/ir_cron.xml",
     ],
     "assets": {
