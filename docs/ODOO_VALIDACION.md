@@ -12,9 +12,10 @@ Esta rama (`fix/odoo19-addon-qa-layouts`) está en QA. No instalarla ni correr m
 | Sintaxis Python del addon | **Verificado localmente** | `python3 -m compileall -q odoo_addons/lba_print_connector` pasó; no carga modelos en Odoo. |
 | Sintaxis de vistas XML | **Verificado localmente** | Parser XML pasó para 11 XML; no comprueba herencia/resolución de vistas de Odoo. |
 | Sintaxis YAML de workflows | **Verificado localmente** | PyYAML pudo parsear `ci-odoo-addon.yml` y `ci-server.yml`; no valida semántica/ejecución de Actions. |
+| Recursos de datos del manifest | **Verificado localmente** | Los 12 paths declarados existen en el checkout; el primer run de CI reveló que tres XML estaban ignorados por Git. Se corrigió `.gitignore` y se incorporan para seguimiento; falta confirmar el rerun. |
 | Pruebas del servidor LBA (`pytest`) | **Verificado localmente** | `cd server && PYTHONPATH=. .venv/bin/python -m pytest -q`: **44 passed**, 27 warnings (1 deprecación Starlette/httpx y 26 de adaptador datetime SQLite/Python 3.12). |
 | Whitespace/conflictos del diff | **Verificado localmente** | `git diff --check` pasó en esa corrida; repetir tras los cambios finales antes de commit. |
-| Instalación limpia Odoo 19 / TransactionCase | **Pendiente** | Workflow `.github/workflows/ci-odoo-addon.yml`; aún hace falta un run GitHub completado y revisar logs. |
+| Instalación limpia Odoo 19 / TransactionCase | **Pendiente** | Primer run GitHub (23-11-2026) se detuvo en la validación de recursos antes de instalar Odoo, porque faltaban tres XML ignorados por Git. El ignore se corrigió; un rerun debe confirmar instalación/tests. |
 | Actualización del addon en base separada | **Pendiente** | Segundo job de base de datos del workflow; todavía sin resultado de ejecución. |
 | Navegador OWL y flujo TPV | **No verificado** | Probar recibo, comanda, deltas, reimpresión, enrutamiento, fallback y rutas nativas en POS Odoo real/de prueba. |
 | E2E Odoo ↔ servidor LBA | **No verificado** | Base Odoo aislada y simulador LBA; comprobar desconexión, reintento, concurrencia y consistencia de estados. |

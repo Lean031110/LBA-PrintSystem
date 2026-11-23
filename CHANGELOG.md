@@ -6,6 +6,7 @@ Rama de trabajo actual: `fix/odoo19-addon-qa-layouts`; la fundación `feature/lb
 ## Auditoría y QA del addon — 2026-11-23 (rama en curso)
 
 - Se agregó CI de instalación limpia y actualización de `lba_print_connector` sobre Odoo 19.0/PostgreSQL 16 y test Node del serializador. **El workflow todavía no se ha ejecutado en GitHub.**
+- El primer run de CI encontró que `**/data/` en `.gitignore` excluía los tres XML requeridos por el manifest. Se estrechó el ignore a `server/data/` y se preparan los XML del addon para seguimiento; el workflow necesita volver a ejecutarse.
 - Se corrigieron referencias de vistas al formato `list`; la cola separa `pending` (local), `queued` (aceptado por LBA) y `sent` (bytes transmitidos, sin confirmación física). El cron reclama lotes con `FOR UPDATE SKIP LOCKED` y conserva HTTP fuera de la llamada síncrona del TPV.
 - Controlador y cola comprueban formato/longitud de clave compatible con LBA, convergen ante colisión concurrente idéntica y rechazan reutilizar una clave con otro contenido. Se reforzaron límites de imagen base64 y bloques.
 - El enrutamiento POS LBA usa departamentos/categorías como fuente de verdad, conserva `super` de las impresoras nativas, omite deltas vacíos y carga los modelos/datos de plantillas necesarios para el POS.
