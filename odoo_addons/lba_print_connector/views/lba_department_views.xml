@@ -4,7 +4,7 @@
         <field name="name">lba.print.department.tree</field>
         <field name="model">lba.print.department</field>
         <field name="arch" type="xml">
-            <tree>
+            <list>
                 <field name="sequence" widget="handle"/>
                 <field name="name"/>
                 <field name="code"/>
@@ -12,7 +12,7 @@
                 <field name="category_ids" widget="many2many_tags"/>
                 <field name="job_count" string="Trabajos"/>
                 <field name="active" widget="boolean_toggle"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -48,7 +48,7 @@
     <record id="action_lba_department" model="ir.actions.act_window">
         <field name="name">Departamentos LBA</field>
         <field name="res_model">lba.print.department</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">Departamentos de impresión</p>
             <p>Caja, Cocina, Pizzería, Bar y Salón vienen precargados;

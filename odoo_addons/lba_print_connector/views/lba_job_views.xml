@@ -4,7 +4,7 @@
         <field name="name">lba.print.job.tree</field>
         <field name="model">lba.print.job</field>
         <field name="arch" type="xml">
-            <tree decoration-success="state == 'sent'"
+            <list decoration-success="state == 'sent'"
                   decoration-danger="state == 'failed'"
                   decoration-warning="state == 'pending'">
                 <field name="create_date" string="Creado"/>
@@ -23,7 +23,7 @@
                 <field name="sent_at" optional="hide"/>
                 <field name="last_error" optional="hide"/>
                 <field name="company_id" groups="base.group_multi_company"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -108,6 +108,6 @@
     <record id="action_lba_job" model="ir.actions.act_window">
         <field name="name">Cola de trabajos LBA</field>
         <field name="res_model">lba.print.job</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
     </record>
 </odoo>

@@ -1,7 +1,7 @@
 name: CI LBA Print Server (pytest)
 on:
   push:
-    branches: [main, feature/lba-print-foundation]
+    branches: [main, feature/lba-print-foundation, fix/odoo19-addon-qa-layouts]
   pull_request:
 
 jobs:

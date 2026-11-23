@@ -1,0 +1,134 @@
+name: CI Odoo 19 — LBA Print Connector
+
+on:
+  push:
+    branches: [fix/odoo19-addon-qa-layouts]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  install-and-test-addon:
+    name: Instalar y probar addon en Odoo 19 Community
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: odoo
+          POSTGRES_PASSWORD: odoo
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U odoo -d postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: odoo
+      PGPASSWORD: odoo
+      ODOO_ADDONS: odoo/addons,odoo_addons
+    steps:
+      - name: Checkout LBA Print System
+        uses: actions/checkout@v4
+
+      - name: Configurar Python compatible con Odoo 19
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Dependencias de sistema
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential libfreetype6-dev libharfbuzz-dev libfribidi-dev \
+            libjpeg-dev liblcms2-dev libldap2-dev libopenjp2-7-dev \
+            libpq-dev libsasl2-dev libssl-dev libtiff5-dev libwebp-dev \
+            libxml2-dev libxslt1-dev zlib1g-dev nodejs npm postgresql-client
+          sudo npm install --global rtlcss
+
+      - name: Clonar código oficial Odoo 19 Community
+        run: git clone --depth 1 --branch 19.0 https://github.com/odoo/odoo.git odoo
+
+      - name: Instalar dependencias Python oficiales de Odoo
+        run: |
+          python -m pip install --upgrade pip wheel
+          python -m pip install -r odoo/requirements.txt
+
+      - name: Validar referencias de datos del manifest
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          manifest = Path("odoo_addons/lba_print_connector/__manifest__.py")
+          data = ast.literal_eval(manifest.read_text(encoding="utf-8"))
+          missing = [item for item in data.get("data", [])
+                     if not (manifest.parent / item).is_file()]
+          if missing:
+              raise SystemExit("Archivos declarados inexistentes: " + ", ".join(missing))
+          print(f"OK: {len(data.get('data', []))} ficheros de datos existen")
+          PY
+
+      - name: Probar serializador y claves del POS
+        run: node odoo_addons/lba_print_connector/tests/test_lba_templates.mjs
+
+      - name: Crear base de datos aislada para instalación limpia
+        run: createdb --maintenance-db=postgres lba_odoo19_install
+
+      - name: Instalar addon y ejecutar TransactionCase en Odoo 19
+        run: |
+          set -o pipefail
+          python odoo/odoo-bin \
+            --addons-path="$ODOO_ADDONS" \
+            --db_host="$PGHOST" --db_port="$PGPORT" \
+            --db_user="$PGUSER" --db_password="$PGPASSWORD" \
+            --database=lba_odoo19_install \
+            --init=lba_print_connector \
+            --without-demo=all --test-enable \
+            --test-tags=/lba_print_connector \
+            --stop-after-init --log-level=test \
+            --logfile=lba-odoo-install.log
+
+      - name: Crear segunda base para validar actualización
+        run: createdb --maintenance-db=postgres lba_odoo19_upgrade
+
+      - name: Instalar versión base en la segunda base
+        run: |
+          python odoo/odoo-bin \
+            --addons-path="$ODOO_ADDONS" \
+            --db_host="$PGHOST" --db_port="$PGPORT" \
+            --db_user="$PGUSER" --db_password="$PGPASSWORD" \
+            --database=lba_odoo19_upgrade \
+            --init=lba_print_connector \
+            --without-demo=all --stop-after-init \
+            --logfile=lba-odoo-upgrade-setup.log
+
+      - name: Actualizar el addon en la segunda base
+        run: |
+          set -o pipefail
+          python odoo/odoo-bin \
+            --addons-path="$ODOO_ADDONS" \
+            --db_host="$PGHOST" --db_port="$PGPORT" \
+            --db_user="$PGUSER" --db_password="$PGPASSWORD" \
+            --database=lba_odoo19_upgrade \
+            --update=lba_print_connector \
+            --without-demo=all --test-enable \
+            --test-tags=/lba_print_connector \
+            --stop-after-init --log-level=test \
+            --logfile=lba-odoo-upgrade.log
+
+      - name: Publicar logs de instalación y pruebas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: odoo19-addon-test-logs
+          if-no-files-found: warn
+          path: |
+            lba-odoo-install.log
+            lba-odoo-upgrade-setup.log
+            lba-odoo-upgrade.log
