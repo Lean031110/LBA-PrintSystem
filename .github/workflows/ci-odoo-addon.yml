@@ -32,7 +32,8 @@ jobs:
       PGPORT: 5432
       PGUSER: odoo
       PGPASSWORD: odoo
-      ODOO_ADDONS: odoo/addons,odoo_addons
+      ODOO_ROOT: ${{ runner.temp }}/odoo
+      ODOO_ADDONS: ${{ runner.temp }}/odoo/addons,odoo_addons
       ODOO_COMMIT: 62c2f793058de87ff453532f206a96a1e71845d2
     steps:
       - name: Checkout LBA Print System
@@ -55,17 +56,17 @@ jobs:
 
       - name: Clonar código oficial Odoo 19 Community
         run: |
-          git init odoo
-          git -C odoo remote add origin https://github.com/odoo/odoo.git
-          git -C odoo fetch --depth 1 origin "$ODOO_COMMIT"
-          git -C odoo checkout --detach FETCH_HEAD
-          test "$(git -C odoo rev-parse HEAD)" = "$ODOO_COMMIT"
+          git init "$ODOO_ROOT"
+          git -C "$ODOO_ROOT" remote add origin https://github.com/odoo/odoo.git
+          git -C "$ODOO_ROOT" fetch --depth 1 origin "$ODOO_COMMIT"
+          git -C "$ODOO_ROOT" checkout --detach FETCH_HEAD
+          test "$(git -C "$ODOO_ROOT" rev-parse HEAD)" = "$ODOO_COMMIT"
           echo "Odoo upstream commit: $ODOO_COMMIT"
 
       - name: Instalar dependencias Python oficiales de Odoo
         run: |
           python -m pip install --upgrade pip wheel
-          python -m pip install -r odoo/requirements.txt
+          python -m pip install -r "$ODOO_ROOT/requirements.txt"
 
       - name: Validar referencias de datos del manifest
         run: |
@@ -90,7 +91,7 @@ jobs:
       - name: Instalar addon y ejecutar TransactionCase en Odoo 19
         run: |
           set -o pipefail
-          python odoo/odoo-bin \
+          python "$ODOO_ROOT/odoo-bin" \
             --addons-path="$ODOO_ADDONS" \
             --db_host="$PGHOST" --db_port="$PGPORT" \
             --db_user="$PGUSER" --db_password="$PGPASSWORD" \
@@ -106,7 +107,7 @@ jobs:
 
       - name: Instalar versión base en la segunda base
         run: |
-          python odoo/odoo-bin \
+          python "$ODOO_ROOT/odoo-bin" \
             --addons-path="$ODOO_ADDONS" \
             --db_host="$PGHOST" --db_port="$PGPORT" \
             --db_user="$PGUSER" --db_password="$PGPASSWORD" \
@@ -118,7 +119,7 @@ jobs:
       - name: Actualizar el addon en la segunda base
         run: |
           set -o pipefail
-          python odoo/odoo-bin \
+          python "$ODOO_ROOT/odoo-bin" \
             --addons-path="$ODOO_ADDONS" \
             --db_host="$PGHOST" --db_port="$PGPORT" \
             --db_user="$PGUSER" --db_password="$PGPASSWORD" \
