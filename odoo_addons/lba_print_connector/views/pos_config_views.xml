@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- TPV: pestaña de impresión LBA en la configuración del punto de venta -->
+    <!-- TPV: pestaña de impresión LBA DENTRO del notebook del formulario
+         de pos.config (Odoo 19: sheet > notebook > page). -->
     <record id="view_pos_config_form_lba" model="ir.ui.view">
         <field name="name">pos.config.form.lba</field>
         <field name="model">pos.config</field>
         <field name="inherit_id" ref="point_of_sale.pos_config_view_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//form/sheet" position="inside">
+            <xpath expr="//form/sheet//notebook" position="inside">
                 <page string="Impresión LBA" name="lba_print">
                     <group>
                         <group string="LBA Print Server">
@@ -20,32 +21,16 @@
                                    options="{'no_create': True}"/>
                         </group>
                     </group>
-                    <div class="text-muted oe_read_only" colspan="2">
-                        <p>Las comandas se enrutan por las categorías de cada
-                        impresora (Impresoras de comanda → campo "Impresora
-                        LBA"). Para conectar el servidor, usa el menú
-                        LBA Print → Servidor (URL, puerto y token del panel).</p>
+                    <div class="text-muted" colspan="2">
+                        <p>Las comandas se enrutan por departamentos
+                        (categoría POS → departamento → impresora) en
+                        Punto de venta → Configuración → LBA Print →
+                        Departamentos. Las plantillas de tickets se editan en
+                        LBA Print → Plantillas de impresión. Para conectar el
+                        servidor, usa el menú LBA Print → Servidor (URL,
+                        puerto y token del panel).</p>
                     </div>
                 </page>
-            </xpath>
-        </field>
-    </record>
-
-    <!-- Impresora de comanda nativa: mapeo con impresora LBA -->
-    <record id="view_pos_printer_form_lba" model="ir.ui.view">
-        <field name="name">pos.printer.form.lba</field>
-        <field name="model">pos.printer</field>
-        <field name="inherit_id" ref="point_of_sale.view_pos_printer_form"/>
-        <field name="arch" type="xml">
-            <xpath expr="//group[1]" position="inside">
-                <group string="LBA Print Server">
-                    <field name="lba_printer_id"
-                           options="{'no_create': True}"
-                           help="Al asignarla, esta impresora de comanda
-                                 imprime por LBA (ESC/POS red) en lugar del
-                                 proxy/IoT. Sigue usando las categorías de
-                                 arriba para decidir qué productos imprime."/>
-                </group>
             </xpath>
         </field>
     </record>

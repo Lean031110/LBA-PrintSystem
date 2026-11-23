@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lba_template_list" model="ir.ui.view">
+        <field name="name">lba.print.template.list</field>
+        <field name="model">lba.print.template</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="not active">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="template_type"/>
+                <field name="department_id" optional="show"/>
+                <field name="printer_id" optional="hide"/>
+                <field name="priority"/>
+                <field name="width_mm" string="Papel (mm)"/>
+                <field name="block_count" string="Bloques"/>
+                <field name="is_default" string="Fábrica" optional="hide"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ======================================================= DISEÑADOR === -->
+    <record id="view_lba_template_form" model="ir.ui.view">
+        <field name="name">lba.print.template.form</field>
+        <field name="model">lba.print.template</field>
+        <field name="arch" type="xml">
+            <form string="Plantilla de impresión">
+                <header>
+                    <button name="action_preview" type="object"
+                            string="Vista previa" icon="fa-eye"
+                            class="btn-primary"/>
+                    <button name="action_test_print" type="object"
+                            string="Impresión de prueba" icon="fa-print"/>
+                    <button name="action_restore_default" type="object"
+                            string="Restaurar valores por defecto"
+                            icon="fa-undo" confirm="¿Restaurar los bloques de fábrica? Se pierden las ediciones de esta plantilla."/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Inactivo"
+                            bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name"
+                                   placeholder="Recibo de caja — Lo D' Leo"/></h1>
+                    </div>
+                    <group>
+                        <group string="Ámbito">
+                            <field name="template_type"/>
+                            <field name="department_id"
+                                   invisible="template_type == 'receipt'"
+                                   options="{'no_create': True}"/>
+                            <field name="printer_id"
+                                   options="{'no_create': True}"/>
+                            <field name="priority"/>
+                            <field name="active"/>
+                            <field name="is_default" readonly="1"/>
+                        </group>
+                        <group string="Papel">
+                            <field name="width_mm"/>
+                            <field name="columns"/>
+                            <field name="company_id"
+                                   groups="base.group_multi_company"/>
+                            <field name="last_modified" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Bloques del ticket" name="blocks">
+                            <field name="block_ids" nolabel="1"
+                                   context="{'default_parent_id': False}">
+                                <list editable="bottom"
+                                      decoration-muted="not display_type">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="block_type"/>
+                                    <field name="display_type" string="Tipo"/>
+                                    <field name="field_key"
+                                           invisible="block_type != 'field'"
+                                           options="{'no_create': True}"/>
+                                    <field name="table_key"
+                                           invisible="block_type != 'table'"
+                                           options="{'no_create': True}"/>
+                                    <field name="condition_key"
+                                           invisible="block_type != 'conditional'"
+                                           options="{'no_create': True}"/>
+                                    <field name="value_text"
+                                           invisible="block_type not in ('text', 'qr', 'barcode')"
+                                           string="Texto/valor"/>
+                                    <field name="align"/>
+                                    <field name="bold"/>
+                                </list>
+                                <form string="Bloque">
+                                    <group>
+                                        <group>
+                                            <field name="block_type"/>
+                                            <field name="sequence"/>
+                                            <field name="align"/>
+                                            <field name="bold"/>
+                                            <field name="size_width"
+                                                   invisible="block_type not in ('text', 'field')"/>
+                                            <field name="size_height"
+                                                   invisible="block_type not in ('text', 'field')"/>
+                                        </group>
+                                        <group>
+                                            <field name="value_text"
+                                                   invisible="block_type not in ('text', 'qr', 'barcode')"
+                                                   placeholder="Texto fijo (también valor de QR/código de barras)"/>
+                                            <field name="field_key"
+                                                   invisible="block_type not in ('field', 'qr', 'barcode')"
+                                                   options="{'no_create': True}"
+                                                   help="Lista blanca: nunca expresiones ni código"/>
+                                            <field name="value_origin"
+                                                   invisible="block_type not in ('qr', 'barcode')"/>
+                                            <field name="ruler_char"
+                                                   invisible="block_type not in ('ruler', 'ruler_double')"/>
+                                            <field name="spacer_lines"
+                                                   invisible="block_type != 'spacer'"/>
+                                            <field name="feed_lines"
+                                                   invisible="block_type != 'feed'"/>
+                                            <field name="cut_feed_before"
+                                                   invisible="block_type != 'cut'"/>
+                                            <field name="qr_size"
+                                                   invisible="block_type != 'qr'"/>
+                                            <field name="symbology"
+                                                   invisible="block_type != 'barcode'"/>
+                                            <field name="image"
+                                                   invisible="block_type != 'image'"
+                                                   widget="image"/>
+                                            <field name="table_key"
+                                                   invisible="block_type != 'table'"
+                                                   options="{'no_create': True}"/>
+                                            <field name="condition_key"
+                                                   invisible="block_type != 'conditional'"
+                                                   options="{'no_create': True}"/>
+                                        </group>
+                                    </group>
+                                    <field name="child_ids"
+                                           invisible="block_type != 'conditional'"
+                                           nolabel="1">
+                                        <list editable="bottom">
+                                            <field name="sequence"
+                                                   widget="handle"/>
+                                            <field name="block_type"/>
+                                            <field name="field_key"
+                                                   invisible="block_type != 'field'"
+                                                   options="{'no_create': True}"/>
+                                            <field name="value_text"
+                                                   invisible="block_type != 'text'"/>
+                                            <field name="align"/>
+                                            <field name="bold"/>
+                                        </list>
+                                    </field>
+                                </form>
+                            </field>
+                        </page>
+                        <page string="Notas" name="notes">
+                            <p class="text-muted">
+                                Los campos dinámicos usan una lista blanca
+                                (nada de Python/JS/Jinja/HTML del usuario).
+                                La vista previa y la impresión usan la misma
+                                estructura de bloques que LBA Print Server
+                                convierte a bytes ESC/POS.
+                            </p>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ================================================= ACCIÓN + MENÚ === -->
+    <record id="action_lba_template" model="ir.actions.act_window">
+        <field name="name">Plantillas de impresión</field>
+        <field name="res_model">lba.print.template</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Diseña tus tickets y comandas</p>
+            <p>Recibos de caja y comandas por departamento, con vista previa
+            de papel térmico (58/80 mm) e impresión de prueba.</p>
+        </field>
+    </record>
+
+    <!-- ====================================================== ASISTENTE === -->
+    <record id="view_lba_preview_wizard_form" model="ir.ui.view">
+        <field name="name">lba.print.preview.wizard.form</field>
+        <field name="model">lba.print.preview.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Vista previa / impresión de prueba">
+                <field name="mode" invisible="1"/>
+                <field name="template_id" invisible="1"/>
+                <group>
+                    <group>
+                        <field name="paper_override"/>
+                        <field name="printer_id"
+                               invisible="mode != 'test'"
+                               domain="[('active', '=', True)]"
+                               options="{'no_create': True}"/>
+                    </group>
+                    <group>
+                        <field name="result_message" readonly="1"
+                               invisible="mode != 'test'"/>
+                    </group>
+                </group>
+                <footer>
+                    <button name="action_refresh_preview" type="object"
+                            string="Actualizar vista previa"
+                            class="btn-primary"
+                            invisible="mode != 'preview'"/>
+                    <button name="action_send_test_print" type="object"
+                            string="Enviar a la impresora"
+                            class="btn-primary"
+                            invisible="mode != 'test'"/>
+                    <button string="Cerrar" special="cancel"
+                            class="btn-secondary"/>
+                </footer>
+                <field name="preview_html" nolabel="1" readonly="1"
+                       class="lba_preview_paper"/>
+            </form>
+        </field>
+    </record>
+</odoo>
