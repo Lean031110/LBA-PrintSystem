@@ -112,7 +112,7 @@ TPV (OWL)                     Odoo backend                  LBA Server          
 | Assets JS del TPV | bundle `point_of_sale._assets_pos` | clave `assets` del `__manifest__.py` |
 | RPC a controlador propio | `rpc()` de `@web/core/network/rpc` → `@http.route(type='jsonrpc', auth='user')` | patrón idéntico al core (`hw_printer.js`) |
 | Cron de reintento | `ir.cron` sobre `lba.print.job` | XML data (patrón `ir_cron_data.xml`) |
-| Categorías→impresora | `pos.printer.product_categories_ids` (m2m `pos.category`) + campo propio `lba_printer_id` | herencia de modelo Odoo (sin parchear archivos del core) |
+| Categorías→impresora LBA | `lba.print.department.category_ids` → `printer_ids`; categorías POS cargadas por `pos.session` | fuente única LBA; `pos.printer` nativo queda sin campo LBA y sigue por `super` |
 
 **Nunca** se modifica un archivo original de Odoo: todo va en patches OWL + herencia de modelos/vistas del addon.
 
@@ -122,6 +122,6 @@ TPV (OWL)                     Odoo backend                  LBA Server          
 2. **DADR-02**: TCP raw 9100 como único transporte v1 (Ethernet/Wi-Fi). USB/LPR/ePOS quedan fuera (documentado).
 3. **DADR-03**: SQLite (no Postgres) para el server: cero dependencias externas, persistencia simple en LXC de 1 GB.
 4. **DADR-04**: dos procesos systemd (API + worker) para reiniciarlos por separado y no congelar la API si el worker espera un socket.
-5. **DADR-05**: `sent` ≠ `printed` en todo el sistema (API, panel, docs, Odoo states `sent`).
+5. **DADR-05**: `sent` ≠ `printed` en todo el sistema. Odoo distingue `pending` local, `queued` aceptado por LBA y `sent` transmitido al socket; ninguno confirma salida física.
 6. **DADR-06**: sin dependencia de `/jsonrpc` ni `/json/2` de Odoo (deprecación hacia Odoo 22): el connector usa controlador propio `jsonrpc auth='user'` llamado con la sesión del TPV.
 7. **DADR-07**: HTMX vendorizado → cero recursos externos en operación (requisito de operación sin Internet).

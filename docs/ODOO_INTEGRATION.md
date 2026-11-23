@@ -1,67 +1,78 @@
-# ODOO_INTEGRATION — LBA Print Connector para Odoo 19 Community (Fase 4)
+# Integración de LBA Print Connector con Odoo 19 Community
 
-> Módulo: `odoo_addons/lba_print_connector` · depende de `point_of_sale` + `pos_restaurant`.
-> No usa IoT Box, no usa la API externa (`/jsonrpc`, `/json/2`), no modifica archivos del core: todo por herencia de modelos/vistas y `patch` OWL oficial (`@web/core/utils/patch`).
+> Estado de esta rama: trabajo de corrección y QA en `fix/odoo19-addon-qa-layouts`. El código y las pruebas estáticas no equivalen a una instalación real de Odoo. Ver `ODOO_VALIDACION.md` para la matriz de evidencia vigente.
 
-## 1. Instalación
+El addon (`odoo_addons/lba_print_connector`) depende de `point_of_sale` y `pos_restaurant`. Extiende modelos/vistas y parchea `PosStore` con OWL; no modifica archivos del core. La referencia de APIs Odoo 19 revisadas está en [`ODOO19_REFERENCE.md`](ODOO19_REFERENCE.md).
+
+## 1. Instalación de desarrollo
+
+La instalación limpia y la actualización se pretenden validar en GitHub Actions mediante [`.github/workflows/ci-odoo-addon.yml`](../.github/workflows/ci-odoo-addon.yml), usando Odoo 19.0 y PostgreSQL 16. El workflow está añadido en esta rama, pero no debe considerarse verde hasta que exista una ejecución completada con logs.
+
+Para probar manualmente, usar únicamente una instancia de desarrollo/QA separada y una base de datos descartable autorizada. No instalar esta rama en la base de producción de Lo D’ Leo. El despliegue de una versión estable deberá seguir un plan de respaldo y migración revisado por el administrador.
+
+## 2. Componentes del addon
+
+| Modelo | Responsabilidad |
+|---|---|
+| `lba.print.server` | Conexión autenticada con LBA, comprobación de salud y sincronización de impresoras. |
+| `lba.print.printer` | Réplica de impresoras LBA y perfil de ancho/columnas; los datos físicos desconocidos no se presuponen. |
+| `lba.print.department` | Enrutamiento Odoo por departamentos y categorías POS, con una o más impresoras LBA y opción de fallback explícito. |
+| `lba.print.template` / `.block` | Editor de bloques ordenados, alcance por impresora/departamento/general, vista previa de 58/80 mm y serialización segura. |
+| `lba.print.job` | Cola durable de salida local, idempotencia, intentos, errores y consulta/retry remoto. |
+
+Las reglas ACL y de compañía están declaradas en `security/`. Su comportamiento en una base real aún requiere ejecutar el workflow y comprobarlo en Odoo.
+
+## 3. Flujo del TPV y estados
+
+1. El TPV crea un registro `lba.print.job` local mediante `/lba_print/jobs`. La ruta valida impresora, compañía, departamento, tipo, payload y clave; una clave ya existente solo se acepta si coincide con impresora, pedido, departamento, tipo y payload. Una colisión con contenido distinto devuelve error.
+2. Esta llamada no hace HTTP al servidor LBA. El TPV recibe el estado local `pending` y no espera por una impresora desconectada.
+3. Un cron reclama trabajos con bloqueo `FOR UPDATE SKIP LOCKED` y envía el trabajo al servidor LBA. `queued` indica que LBA aceptó/encoló el trabajo; los errores y reintentos quedan registrados localmente.
+4. La consulta periódica sincroniza el estado del trabajo remoto. `sent` significa que LBA informó transmisión de bytes al socket TCP, no que el papel haya salido ni que se haya confirmado físicamente.
+
+| Estado Odoo | Semántica |
+|---|---|
+| `pending` | Guardado local y esperando despacho/reintento. |
+| `queued` | LBA aceptó el trabajo; no equivale a impresión física. |
+| `sent` | Bytes transmitidos según el servidor LBA; sin confirmación de papel. |
+| `failed` / `cancelled` | Fallo agotado o cancelación registrada. |
+
+La ejecución real del cron, el bloqueo bajo varios workers y el despacho ante fallos todavía deben validarse en Odoo/PostgreSQL. No se afirma entrega física.
+
+## 4. Enrutamiento POS
+
+- La configuración de `lba.print.department` es la única fuente de enrutamiento LBA. Las categorías POS asignadas a departamentos determinan qué productos entran en cada comanda; las reglas de categorías superpuestas en jerarquía se rechazan para evitar ambigüedad.
+- Los productos sin categoría asignada a una ruta no deben entrar en el fallback. El fallback es explícito y filtra categorías ya cubiertas por departamentos asignados.
+- Las impresoras de comanda Odoo que no se enrutan a LBA conservan la ruta nativa mediante `super`. Los recibos solo usan LBA cuando el TPV tiene LBA activado y una impresora de recibos configurada.
+- No se envían tickets de delta vacíos.
+
+Los detalles dependen de la estructura de datos POS de Odoo 19 descrita en `ODOO19_REFERENCE.md`; la ejecución OWL/navegador aún no está verificada.
+
+## 5. Idempotencia y reimpresiones
+
+Cada operación POS incluye una clave idempotente de hasta 200 caracteres, compatible con el patrón y longitud del servidor LBA. Repetir el mismo evento con el mismo documento converge en el mismo trabajo; reutilizar una clave para un payload distinto se rechaza. Los retries automáticos conservan la clave, mientras que una reimpresión intencional crea otra. Odoo y LBA conservan sus propios registros.
+
+Los tests de Node cubren los builders y el serializador de plantillas; no sustituyen pruebas concurrentes en Odoo, navegador ni servidor conectado.
+
+## 6. Diseñador de tickets
+
+Las plantillas se componen de bloques ordenados (texto, campos dinámicos, reglas, tablas, condicionales, QR/código de barras, imagen, avance y corte). Campos, tablas y condiciones usan listas blancas; no se evalúan expresiones, JavaScript, Python, Jinja ni HTML arbitrario. El ancho se toma del perfil configurado (58/80 mm), sin deducir capacidades de una impresora desconocida.
+
+El serializador de plantilla genera el documento usado por el flujo POS; la vista previa y la prueba de impresión usan el serializador del modelo. La equivalencia visual exacta entre ambos y la impresión en navegador/hardware sigue pendiente de una prueba de extremo a extremo. Una plantilla que no genere ningún bloque no debe imprimir un ticket vacío.
+
+## 7. Verificación disponible y pendiente
+
+Comandos previstos desde la raíz del repositorio:
 
 ```bash
-# en el host Odoo (ej. /opt/odoo/custom-addons)
-cp -r odoo_addons/lba_print_connector /opt/odoo/custom-addons/
-chown -R odoo: /opt/odoo/custom-addons/lba_print_connector
-# reiniciar servicio Odoo y, en Ajustes → Aplicaciones, instalar "LBA Print Connector"
+node odoo_addons/lba_print_connector/tests/test_lba_templates.mjs
+python3 -m compileall -q odoo_addons/lba_print_connector
+# El workflow de GitHub instala Odoo 19 y ejecuta los TransactionCase.
 ```
 
-Requisitos verificados: Odoo 19 Community (rama 19.0), `point_of_sale` y `pos_restaurant` instalados.
+El estado de cada comando y la ejecución real de `pytest`, GitHub Actions, instalación, navegador/E2E y hardware se registra en [`ODOO_VALIDACION.md`](ODOO_VALIDACION.md). No atribuir al addon validación de instalación hasta que haya evidencia de Odoo en ejecución.
 
-## 2. Modelos (todos propios, prefijo `lba.print.`)
+## 8. Límites explícitos
 
-| Modelo | Campos clave | Función |
-|---|---|---|
-| `lba.print.server` | `name`, `base_url`, `port` (8000), `api_token`, `active`, `state`, `last_check`, `last_message` | Configuración del servidor LBA. Botones: **Probar conexión** (`GET /health`) y **Sincronizar impresoras** (`GET /printers`) |
-| `lba.print.printer` | `server_id`, `external_id`, `name`, `manufacturer`, `model`, `ip`, `port`, `paper_width_mm`, `protocol`, `status`, `active` | Réplica de las impresoras del servidor (sincronizada; modificable desde el servidor) |
-| `lba.print.department` | `name`, `code`, `printer_ids` (m2m), `category_ids` (m2m `pos.category`), `active` | Departamentos: **Caja, Cocina, Pizzería, Bar, Salón** cargados por data XML (`noupdate`); se pueden añadir personalizados |
-| `lba.print.job` | `uuid`, `department_id`, `printer_id`, `order_ref`, `order_uuid`, `kind` (receipt/kitchen/delta/reprint), `payload_json`, `state` (pending/sent/failed/cancelled), `attempts`, `max_attempts`, `next_attempt`, `last_error`, `external_job_id` | **Cola de salida persistente en Odoo** para cuando LBA no responda |
-
-Herencias (sin tocar el core):
-
-- `pos.printer` += `lba_printer_id` (m2o `lba.print.printer`): cada impresora de comanda nativa del TPV se mapea a una impresora LBA (las categorías siguen decidiéndose con el campo nativo `product_categories_ids` — verificado en `RESEARCH.md` §2.2).
-- `pos.config` += `lba_receipt_printer_id` (m2o) + `lba_active` (bool): impresora de recibos de caja.
-
-## 3. Flujo técnico (ver `RESEARCH.md` §2 para las líneas exactas del core)
-
-1. **Recibo tras pago** — `patch(PosStore.prototype, { printReceipt() })` (`point_of_sale/.../services/pos_store.js` L1969): si `pos.config.lba_active` y hay impresora de recibo asignada → construye payload estructurado (encabezado: compañía, nº ticket `pos_reference`, camarero `user_id`, mesa si restaurante; líneas con qty/precio/variantes `attribute_value_ids`/notas `customer_note`; totales; método de pago; QR opcional con `order.uuid`) → `rpc('/lba_print/jobs', …)`. Si falla o no está configurado → `super.printReceipt(...)` (comportamiento nativo intacto).
-2. **Comandas** — `patch(PosStore.prototype, { printChanges(order, orderChange, reprint, printers) })` (`pos_store.js` L2255): para cada `printer` con `printer.config.lba_printer_id`, convierte el `orderChange` ya calculado por el core (`new`/`cancelled`/`noteUpdate` — no se re-implementa nada) en payload con mesa, camarero, `pos_reference`, deltas con cantidades/variantes/notas → `rpc('/lba_print/jobs', …)`; impresoras sin mapeo LBA siguen el camino nativo. El patch respeta `updateLastOrderChange()` y `uiState.lastPrints` (antiduplicados nativos).
-3. **Controlador** — `@http.route('/lba_print/jobs', type='jsonrpc', auth='user', csrf=False)` (patrón del core; `type='json'` está deprecado en 19): crea `lba.print.job` con `uuid` + `idempotency_key = order.uuid + hash(delta) + printer_id` y dispara un intento inmediato con `requests.post(..., timeout=2.5)`; si LBA no responde, el trabajo queda `pending` en la cola de Odoo (el TPV nunca se bloquea > 3 s).
-4. **Cron** — `ir.cron` "LBA: reintentar trabajos" (cada minuto): procesa pendientes con backoff (5 s→300 s, máx. 5) y "LBA: actualizar estados" (cada 5 min) consulta `GET /jobs/{external_job_id}` para refrescar `sent/failed`.
-5. **Errores de comunicación** — se muestran en el TPV con un toast no bloqueante (OWL `makeToast`/popup ligero) y quedan en la cola visible en el backend (vista `lba.print.job` con filtro por estado).
-
-## 4. Menús y pantallas (backend Odoo)
-
-- Menú raíz **LBA Print**: Servidor · Impresoras · Departamentos · Cola de trabajos.
-- Formulario del servidor con botones **Probar conexión / Sincronizar impresoras** y estado (`state` + `last_message`).
-- Departamentos: name + impresoras + categorías POS (multi), formulario tipo kanban/list.
-- Cola: tree con `state`, `attempts`, `last_error`, acciones "Reintentar ahora" y "Cancelar".
-- Ajustes del TPV (`pos.config`): en la pestaña de impresión del TPV, campos `lba_active`, `lba_receipt_printer_id`; formulario de `pos.printer` con `lba_printer_id`.
-
-## 5. Anti-duplicados (capas)
-
-1. TPV: `nb_print`/`canPrintReceipt` (nativo) y `uiState.lastPrints` (reimpresiones).
-2. Odoo: `uuid` único de `lba.print.job` + `idempotency_key` compuesta.
-3. LBA Server: `idempotency_key` única en SQLite (respuesta 409 con el job existente).
-
-## 6. Pruebas del addon
-
-- Unit tests (se ejecutan con el runner de Odoo): `tests/test_lba_server.py` (mock de `requests`), `tests/test_lba_job.py` (estados/reintentos), `tests/test_departments.py` (5 departamentos por defecto).
-  ```bash
-  odoo-bin -c … -d test_lba -i lba_print_connector \
-      --test-tags /lba_print_connector --stop-after-init
-  ```
-- **Guía de validación en tu instancia local** (`tests/GUIDA_VALIDACION.md`): 12 pasos desde instalar el módulo hasta imprimir comanda de cancelación, incluida la comprobación de que el TPV no se congela si apagas LBA.
-
-## 7. Qué NO hace (honestidad técnica)
-
-- No sustituye pantallas de cocina (`pos_preparation_display`).
-- No imprime en USB/Bluetooth desde el navegador del TPV (fuera de alcance; LBA es servidor de impresoras de red).
-- No garantiza "impreso físicamente": los estados se propagan tal como LBA los reporta (`sent`).
-- El reintento inmediato usa `requests` con `timeout` — está en `requirements.txt` de Odoo 19 (verificado), así que no añade dependencias Python al host Odoo.
+- No sustituye `pos_preparation_display` ni confirma físicamente la salida del papel.
+- No se han verificado el protocolo, el ancho, el modelo ni las funciones físicas de la impresora Volcora. Se conoce por reporte del usuario que es térmica y Wi-Fi para cocina; no se enviarán comandos ni se escaneará la LAN para identificarla sin autorización e identificación adecuada.
+- USB/Bluetooth y periféricos fuera del servidor LBA de red quedan fuera del alcance actual.

@@ -16,6 +16,9 @@ Sistema de impresión térmica para **Odoo 19 Community** en red local, sin nube
 | [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) | Matriz de compatibilidad (plataformas, impresoras, encodings) y guía de verificación con hardware |
 | [docs/API_CONTRACT.md](docs/API_CONTRACT.md) | Contrato REST `/api/v1` con ejemplos JSON |
 | [docs/ODOO_INTEGRATION.md](docs/ODOO_INTEGRATION.md) | Diseño e integración del addon Odoo |
+| [docs/ODOO19_REFERENCE.md](docs/ODOO19_REFERENCE.md) | Referencias del core Odoo 19 consultadas para carga POS y puntos de extensión |
+| [docs/ODOO_VALIDACION.md](docs/ODOO_VALIDACION.md) | Matriz de evidencia y checklist aislado de QA del addon |
+| [docs/PRINT_TEMPLATE_DESIGNER.md](docs/PRINT_TEMPLATE_DESIGNER.md) | Contrato del diseñador visual y serialización de tickets |
 | [docs/PROXMOX_INSTALLATION.md](docs/PROXMOX_INSTALLATION.md) | Instalación en LXC no privilegiado de Proxmox |
 | [docs/SECURITY.md](docs/SECURITY.md) | Modelo de amenazas y mitigaciones |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Fases con objetivos y criterios de aceptación |
@@ -49,8 +52,20 @@ Ver [docs/PROXMOX_INSTALLATION.md](docs/PROXMOX_INSTALLATION.md) (LXC Debian 12 
 ## Pruebas
 
 ```bash
-cd server && . .venv/bin/activate && pytest -q
+cd server && . .venv/bin/activate && PYTHONPATH=. python -m pytest -q
+cd ..
+node odoo_addons/lba_print_connector/tests/test_lba_templates.mjs
 ```
+
+### Estado de QA del addon Odoo
+
+El trabajo actual está en `fix/odoo19-addon-qa-layouts`. La definición de CI
+para instalación limpia y actualización con Odoo 19/PostgreSQL está añadida,
+pero no se debe considerar aprobada hasta ver una ejecución real en GitHub.
+El test Node del serializador no valida el patch OWL en navegador. La matriz
+con resultados y pasos pendientes está en [docs/ODOO_VALIDACION.md](docs/ODOO_VALIDACION.md);
+no se ha verificado instalación de Odoo, E2E/navegador ni hardware en este
+entorno. No desplegar esta rama en la base real de Lo D’ Leo.
 
 ## Estructura
 

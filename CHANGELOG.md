@@ -1,7 +1,20 @@
 # CHANGELOG — Historial detallado de cambios
 
-Formato: por fase, con objetivos → entregables → pruebas → pendientes
-(regla 12 del encargo). Repo: `LBA-PrintSystem`, rama `feature/lba-print-foundation`.
+Formato: por fase, con objetivos → entregables → pruebas → pendientes.
+Rama de trabajo actual: `fix/odoo19-addon-qa-layouts`; la fundación `feature/lba-print-foundation` no se modificó.
+
+## Auditoría y QA del addon — 2026-11-23 (rama en curso)
+
+- Se agregó CI de instalación limpia y actualización de `lba_print_connector` sobre Odoo 19.0/PostgreSQL 16 y test Node del serializador. **El workflow todavía no se ha ejecutado en GitHub.**
+- Se corrigieron referencias de vistas al formato `list`; la cola separa `pending` (local), `queued` (aceptado por LBA) y `sent` (bytes transmitidos, sin confirmación física). El cron reclama lotes con `FOR UPDATE SKIP LOCKED` y conserva HTTP fuera de la llamada síncrona del TPV.
+- Controlador y cola comprueban formato/longitud de clave compatible con LBA, convergen ante colisión concurrente idéntica y rechazan reutilizar una clave con otro contenido. Se reforzaron límites de imagen base64 y bloques.
+- El enrutamiento POS LBA usa departamentos/categorías como fuente de verdad, conserva `super` de las impresoras nativas, omite deltas vacíos y carga los modelos/datos de plantillas necesarios para el POS.
+- Se documentaron diseñador, criterios QA y referencia de Odoo 19. `ODOO_INTEGRATION.md`, `ODOO_VALIDACION.md` y `ARCHITECTURE.md` reflejan que navegador/E2E, instalación real y hardware siguen pendientes.
+- Evidencia local de esta revisión: test Node pasó; `compileall` pasó; 11 XML parsearon; ambos workflows YAML parsearon; suite del servidor **44 passed** (27 advertencias de dependencias); `git diff --check` pasó antes de los últimos retoques. La prueba Python de TransactionCase requiere Odoo real; no se afirma ejecutada en este entorno.
+
+### Fuera de alcance verificado
+
+No se instaló ni modificó la base de producción de Lo D’ Leo. La impresora Volcora no se ha identificado ni probado; solo se conoce por reporte del usuario como térmica Wi-Fi para cocina. No se hicieron escaneos LAN ni se enviaron comandos a hardware.
 
 ## [0.1.0] — 2026-11-21 — FUNDACIÓN (Fases 0–9 núcleo)
 
@@ -55,33 +68,17 @@ Auth: token Bearer (hash SHA-256 en BD, prefijo identificable), **allowlist
 de IP** por CIDR, rate limit 120/min, **SSRF bloqueado** (públicas,
 169.254.169.254, 100.64/10, test-nets), validación Pydantic estricta.
 
-### Fase 4 — Complemento Odoo `lba_print_connector` ✅ (validación en instancia real pendiente)
+### Fase 4 — Complemento Odoo `lba_print_connector` (estado actualizado por auditoría)
 - Manifest 19.0.1.0.0 (deps `point_of_sale`+`pos_restaurant`; MIT;
   assets → `point_of_sale._assets_pos`).
-- Models: `lba.print.server` (URL/puerto/token/estado + **Probar conexión**/
-  **Sincronizar impresoras**), `lba.print.printer` (réplica sincronizada),
-  `lba.print.department` (Caja/Cocina/Pizzería/Bar/Salón precargados +
-  custom; m2m impresoras + **pos.category**), `lba.print.job` (**cola de
-  salida persistente** con uuid + idempotency_key únicos, estados,
-  reintentos, cron 1 min + refresco 5 min).
-- Herencias sin tocar el core: `pos.printer.lba_printer_id`,
-  `pos.config.lba_active/lba_receipt_printer_id` (+`_load_pos_data_fields`).
-- Controller `/lba_print/jobs` (`type='jsonrpc'`, `auth='user'`, patrón del
-  core) con envío inmediato (timeout corto) y cola de respaldo.
-- **OWL**: `patch(PosStore.prototype.printReceipt)` y `printChanges` con
-  `super` de respaldo; deltas nativos (`generateOrderChange`) → payload
-  estructurado; semántica `nb_print`/`lastPrints` replicada; notificaciones
-  no bloqueantes; errores → cola Odoo.
-- Security: ACLs por grupo + reglas multi-compañía + token solo `group_system`.
-- Tests Odoo (mocks de requests): servidor/sincronización, cola completa,
-  idempotencia, payloads, departamentos. **Guía de validación** en
-  `docs/ODOO_VALIDACION.md` (12 pasos + CI).
+- Modelos de servidor/impresora/departamento, plantillas/bloques y cola local persistente; CI definido para instalación y actualización, pendiente de ejecución real.
+- El enrutamiento LBA proviene de `lba.print.department.category_ids` y `printer_ids`; no existe el campo `pos.printer.lba_printer_id`. Las impresoras nativas continúan mediante `super`.
+- `/lba_print/jobs` persiste el trabajo y no hace HTTP remoto inmediato. El cron procesa fuera del camino del POS; `pending`, `queued` y `sent` tienen semánticas distintas.
+- Los tests Odoo son `TransactionCase` y aún deben ejecutarse bajo Odoo 19. El test Node solo valida serialización/claves y no prueba OWL.
+- Guía y evidencia vigente: `docs/ODOO_INTEGRATION.md` y `docs/ODOO_VALIDACION.md`.
 
 ### Fase 5 — Colas y fiabilidad ✅
-Claim atómico (`UPDATE … WHERE status='pending'`) + `db.refresh` tras claim
-(bug de identity-map detectado por tests y corregido); serialización natural
-por impresora; backoff 5s→300s; máx. 5; `retry`/`reprint`/`cancel`;
-recuperación de huérfanos al reiniciar; SQLite WAL; eventos auditables.
+En el servidor LBA, la cola mantiene backoff y persistencia documentados en su suite. En el addon Odoo, el claim es SQL `FOR UPDATE SKIP LOCKED`; su comportamiento con workers concurrentes requiere TransactionCase/E2E en PostgreSQL y todavía no se ha validado.
 
 ### Fase 6 — Seguridad ✅
 Implementada por diseño en cada capa (ver `docs/SECURITY.md`): tokens
@@ -110,7 +107,7 @@ secciones 200). + Tests Odoo con mocks. CI GitHub Actions incluida.
 
 ### Fase 9 — Entrega ✅ (esta sesión)
 Servidor funcional · panel · API documentada (OpenAPI + API_CONTRACT) ·
-addon instalable · instalador LXC + scripts · systemd · pruebas · 10 docs
+código del addon preparado (instalación real no verificada) · instalador LXC + scripts · systemd · pruebas · 10 docs
 técnicas · guía de usuario · matriz de compatibilidad · este CHANGELOG ·
 repo público GitHub `LBA-PrintSystem` (MIT) · zip descargable.
 

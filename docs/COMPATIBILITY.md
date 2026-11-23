@@ -25,6 +25,7 @@
 | **Xprinter XP-N160II** | 80 mm (48 col) | USB + **Ethernet** + Wi-Fi + BT, 160 mm/s | Sí (SDK oficial ESC/POS, DIP de fuente) | [HW] | `generic` | Candidato prioritario |
 | **Xprinter XP-N160** | 80 mm | USB + Ethernet | Sí (misma familia) | [HW] | `generic` | Candidato |
 | Xprinter XP-58 (USB/BT) | 58 mm | sin LAN | Sí | — | — | [—] sin red: fuera de v1 |
+| **Volcora (modelo no identificado)** | desconocido | Wi-Fi [dato del usuario, sin verificar] | desconocido | desconocido | desconocido | Uso previsto en cocina; térmica [dato del usuario]. No se han probado protocolo, ancho, puerto ni funciones. |
 | Epson TM-T88V… | 80 mm | Ethernet | Sí | Sí | `generic`/perfil escpos-db | Compatible (no es objetivo de compra) |
 | **LBA Simulator** (incluido) | virtual | TCP local | emulado | Sí (puerto libre) | `simulator` | [V] usado en pruebas y demo |
 
