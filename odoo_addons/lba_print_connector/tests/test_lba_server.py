@@ -23,7 +23,7 @@ class TestLbaServer(TransactionCase):
         })
         pos_user = self.env["res.users"].create({
             "name": "POS LBA read only", "login": "lba-pos-read-only",
-            "groups_id": [(6, 0, [
+            "group_ids": [(6, 0, [
                 self.env.ref("base.group_user").id,
                 self.env.ref("point_of_sale.group_pos_user").id,
             ])],

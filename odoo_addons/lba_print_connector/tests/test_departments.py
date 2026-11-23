@@ -16,13 +16,13 @@ class TestDepartments(TransactionCase):
         pos_user = self.env["res.users"].create({
             "name": "LBA POS read-only",
             "login": f"lba-pos-ro-{uuid.uuid4()}",
-            "groups_id": [(6, 0, [base_user,
+            "group_ids": [(6, 0, [base_user,
                                     self.env.ref("point_of_sale.group_pos_user").id])],
         })
         manager = self.env["res.users"].create({
             "name": "LBA POS manager",
             "login": f"lba-pos-manager-{uuid.uuid4()}",
-            "groups_id": [(6, 0, [base_user,
+            "group_ids": [(6, 0, [base_user,
                                     self.env.ref("point_of_sale.group_pos_manager").id])],
         })
         with self.assertRaises(AccessError):

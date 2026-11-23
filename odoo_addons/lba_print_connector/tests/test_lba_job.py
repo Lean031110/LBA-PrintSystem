@@ -185,7 +185,7 @@ class TestLbaJob(TransactionCase):
             pos_user = self.env["res.users"].create({
                 "name": f"LBA POS {label} Direct Create Test",
                 "login": f"lba-pos-{label}-{uuid.uuid4()}",
-                "groups_id": [(6, 0, groups_base + [group_id])],
+                "group_ids": [(6, 0, groups_base + [group_id])],
             })
             values = dict(direct_values,
                           idempotency_key=f"odoo:direct:{label}:{uuid.uuid4()}")
@@ -203,7 +203,7 @@ class TestLbaJob(TransactionCase):
         selected = self._job(key="odoo:manual:selected")
         unrelated = self._job(key="odoo:manual:unrelated")
         with patch.object(type(selected), "_check_pos_manager"), \
-                patch.object(type(selected), "_post_job") as post_job:
+                patch.object(type(selected), "_post_job", autospec=True) as post_job:
             selected.action_process_now()
             post_job.assert_called_once_with(selected)
         self.assertEqual(unrelated.state, "pending")
