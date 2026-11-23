@@ -35,7 +35,7 @@ class LbaPrintServer(models.Model):
     state = fields.Selection(
         [("draft", "Sin verificar"), ("online", "Conectado"),
          ("offline", "Sin conexión")],
-        default="draft", copy=False, tracking=True)
+        default="draft", copy=False)
     last_check = fields.Datetime(readonly=True, copy=False)
     last_message = fields.Char(readonly=True, copy=False)
     printer_ids = fields.One2many("lba.print.printer", "server_id",

@@ -93,14 +93,13 @@
                         domain="[('kind', '=', 'receipt')]"/>
                 <filter name="f_delta" string="Cambios/Cancelaciones"
                         domain="[('kind', 'in', ('delta', 'kitchen'))]"/>
-                <group expand="0" string="Agrupar por">
-                    <filter name="g_state" string="Estado"
-                            context="{'group_by': 'state'}"/>
-                    <filter name="g_printer" string="Impresora"
-                            context="{'group_by': 'printer_id'}"/>
-                    <filter name="g_kind" string="Tipo"
-                            context="{'group_by': 'kind'}"/>
-                </group>
+                <separator/>
+                <filter name="g_state" string="Agrupar por estado"
+                        context="{'group_by': 'state'}"/>
+                <filter name="g_printer" string="Agrupar por impresora"
+                        context="{'group_by': 'printer_id'}"/>
+                <filter name="g_kind" string="Agrupar por tipo"
+                        context="{'group_by': 'kind'}"/>
             </search>
         </field>
     </record>
