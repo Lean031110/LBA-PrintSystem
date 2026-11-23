@@ -3,15 +3,15 @@
 Formato: por fase, con objetivos → entregables → pruebas → pendientes.
 Rama de trabajo actual: `fix/odoo19-addon-qa-layouts`; la fundación `feature/lba-print-foundation` no se modificó.
 
-## Auditoría y QA del addon — 2026-11-23 (rama en curso)
+## Auditoría y QA del addon — 2026-11-23 (rama de trabajo)
 
-- Se agregó CI de instalación limpia y actualización de `lba_print_connector` sobre Odoo 19.0/PostgreSQL 16 y test Node del serializador. **El workflow todavía no se ha ejecutado en GitHub.**
-- El primer run de CI encontró que `**/data/` en `.gitignore` excluía los tres XML requeridos por el manifest. Se estrechó el ignore a `server/data/` y se preparan los XML del addon para seguimiento; el workflow necesita volver a ejecutarse.
-- Se corrigieron referencias de vistas al formato `list`; la cola separa `pending` (local), `queued` (aceptado por LBA) y `sent` (bytes transmitidos, sin confirmación física). El cron reclama lotes con `FOR UPDATE SKIP LOCKED` y conserva HTTP fuera de la llamada síncrona del TPV.
-- Controlador y cola comprueban formato/longitud de clave compatible con LBA, convergen ante colisión concurrente idéntica y rechazan reutilizar una clave con otro contenido. Se reforzaron límites de imagen base64 y bloques.
-- El enrutamiento POS LBA usa departamentos/categorías como fuente de verdad, conserva `super` de las impresoras nativas, omite deltas vacíos y carga los modelos/datos de plantillas necesarios para el POS.
-- Se documentaron diseñador, criterios QA y referencia de Odoo 19. `ODOO_INTEGRATION.md`, `ODOO_VALIDACION.md` y `ARCHITECTURE.md` reflejan que navegador/E2E, instalación real y hardware siguen pendientes.
-- Evidencia local de esta revisión: test Node pasó; `compileall` pasó; 11 XML parsearon; ambos workflows YAML parsearon; suite del servidor **44 passed** (27 advertencias de dependencias); `git diff --check` pasó antes de los últimos retoques. La prueba Python de TransactionCase requiere Odoo real; no se afirma ejecutada en este entorno.
+- Se agregó CI de instalación limpia y actualización de `lba_print_connector` sobre Odoo 19.0/PostgreSQL 16. El run final [45237021879](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45237021879), SHA `d3c99b323c78af9b1bedcfa4f635391e44a3d0fe`, pasó la instalación, los TransactionCase y la actualización del addon en una segunda base aislada. Los logs registran 22 tests y 0 fallos/errores tanto en instalación como en upgrade.
+- El run del servidor [45237021802](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45237021802), en el mismo SHA, pasó **44 tests** y el smoke end-to-end de API, cola, rendering, simulador, worker y panel.
+- La secuencia de QA corrigió: XML del manifest ignorados por `**/data/`; una vista de búsqueda incompatible con el RNG de Odoo 19; fixtures de TransactionCase con nombres repetidos; y un helper que reemplazaba `blocks=[]` por un payload válido. También se corrigió el límite de bloques del diseñador y se retiró `tracking` no soportado por el modelo.
+- Los logs de Odoo contienen dos sentencias SQL con nivel `ERROR` por cada ejecución: son las violaciones de unicidad intencionales de tests, atrapadas dentro de savepoints. Los resúmenes de instalación y actualización confirman 0 tests fallidos y 0 errores. GitHub también anota que las acciones actuales de Node 20 son forzadas a Node 24; es un aviso de mantenimiento, no un fallo del run.
+- El enrutamiento POS LBA usa departamentos/categorías como fuente de verdad, conserva `super` de las impresoras nativas, omite deltas vacíos y carga los modelos/datos de plantillas necesarios para el POS. La cola conserva `pending` local, `queued` aceptado por LBA y `sent` transmitido al socket, sin afirmar salida física.
+- Evidencia adicional local: test Node pasó; `compileall` y sintaxis Python de tests pasaron; 11 XML parsearon y el `search_view` pasó el RNG oficial de Odoo 19; YAML parseado; `git diff --check` pasó antes de documentar. La suite final del servidor fue ejecutada por CI (44/44); esta continuación no ejecutó TransactionCase en un Odoo local.
+- Siguen pendientes navegador/OWL, flujo real TPV, integración E2E Odoo↔LBA, carrera de varios workers en una prueba concurrente y hardware. No se instaló ni modificó producción.
 
 ### Fuera de alcance verificado
 
@@ -72,14 +72,14 @@ de IP** por CIDR, rate limit 120/min, **SSRF bloqueado** (públicas,
 ### Fase 4 — Complemento Odoo `lba_print_connector` (estado actualizado por auditoría)
 - Manifest 19.0.1.0.0 (deps `point_of_sale`+`pos_restaurant`; MIT;
   assets → `point_of_sale._assets_pos`).
-- Modelos de servidor/impresora/departamento, plantillas/bloques y cola local persistente; CI definido para instalación y actualización, pendiente de ejecución real.
+- Modelos de servidor/impresora/departamento, plantillas/bloques y cola local persistente; instalación limpia y actualización verificadas por CI aislado en Odoo 19/PostgreSQL 16 (run `45237021879`). Esto no significa que se haya instalado en la instancia real del usuario.
 - El enrutamiento LBA proviene de `lba.print.department.category_ids` y `printer_ids`; no existe el campo `pos.printer.lba_printer_id`. Las impresoras nativas continúan mediante `super`.
 - `/lba_print/jobs` persiste el trabajo y no hace HTTP remoto inmediato. El cron procesa fuera del camino del POS; `pending`, `queued` y `sent` tienen semánticas distintas.
-- Los tests Odoo son `TransactionCase` y aún deben ejecutarse bajo Odoo 19. El test Node solo valida serialización/claves y no prueba OWL.
+- Los TransactionCase pasaron en CI bajo Odoo 19. El test Node solo valida serialización/claves y no prueba OWL.
 - Guía y evidencia vigente: `docs/ODOO_INTEGRATION.md` y `docs/ODOO_VALIDACION.md`.
 
 ### Fase 5 — Colas y fiabilidad ✅
-En el servidor LBA, la cola mantiene backoff y persistencia documentados en su suite. En el addon Odoo, el claim es SQL `FOR UPDATE SKIP LOCKED`; su comportamiento con workers concurrentes requiere TransactionCase/E2E en PostgreSQL y todavía no se ha validado.
+En el servidor LBA, la cola mantiene backoff y persistencia; el CI final pasó 44 tests y smoke end-to-end con simulador. En Odoo, el addon y el cron pasaron TransactionCase en PostgreSQL; el mecanismo `FOR UPDATE SKIP LOCKED` aún requiere una prueba de estrés con varios workers concurrentes para verificar ausencia de doble reclamo bajo carrera real.
 
 ### Fase 6 — Seguridad ✅
 Implementada por diseño en cada capa (ver `docs/SECURITY.md`): tokens
@@ -107,8 +107,7 @@ secciones 200). + Tests Odoo con mocks. CI GitHub Actions incluida.
 **Pendiente**: badge CI en GitHub, verificación física Rongta/Xprinter.
 
 ### Fase 9 — Entrega ✅ (esta sesión)
-Servidor funcional · panel · API documentada (OpenAPI + API_CONTRACT) ·
-código del addon preparado (instalación real no verificada) · instalador LXC + scripts · systemd · pruebas · 10 docs
+Servidor funcional · panel · API documentada (OpenAPI + API_CONTRACT) · addon instalado/actualizado en CI aislado Odoo 19 (sin despliegue en producción) · instalador LXC + scripts · systemd · pruebas · docs
 técnicas · guía de usuario · matriz de compatibilidad · este CHANGELOG ·
 repo público GitHub `LBA-PrintSystem` (MIT) · zip descargable.
 

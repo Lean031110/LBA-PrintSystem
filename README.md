@@ -59,13 +59,17 @@ node odoo_addons/lba_print_connector/tests/test_lba_templates.mjs
 
 ### Estado de QA del addon Odoo
 
-El trabajo actual está en `fix/odoo19-addon-qa-layouts`. La definición de CI
-para instalación limpia y actualización con Odoo 19/PostgreSQL está añadida,
-pero no se debe considerar aprobada hasta ver una ejecución real en GitHub.
-El test Node del serializador no valida el patch OWL en navegador. La matriz
-con resultados y pasos pendientes está en [docs/ODOO_VALIDACION.md](docs/ODOO_VALIDACION.md);
-no se ha verificado instalación de Odoo, E2E/navegador ni hardware en este
-entorno. No desplegar esta rama en la base real de Lo D’ Leo.
+El trabajo está en `fix/odoo19-addon-qa-layouts`; el commit de código validado
+por ambos workflows es `d3c99b323c78af9b1bedcfa4f635391e44a3d0fe`. Quedaron
+verdes en GitHub Actions el [CI de Odoo 19](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45237021879)
+(instalación limpia, TransactionCase y actualización en una segunda base con
+PostgreSQL 16) y el [CI del servidor](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45237021802)
+(44 tests y smoke end-to-end con simulador/worker/panel).
+
+Esto no valida el patch OWL en navegador, el flujo integrado Odoo↔servidor LBA
+ni impresión física. La matriz con evidencia y pendientes está en
+[docs/ODOO_VALIDACION.md](docs/ODOO_VALIDACION.md). No instalar esta rama ni
+ejecutar migraciones en la base real de Lo D’ Leo.
 
 ## Estructura
 

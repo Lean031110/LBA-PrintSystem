@@ -61,15 +61,20 @@ El serializador de plantilla genera el documento usado por el flujo POS; la vist
 
 ## 7. Verificación disponible y pendiente
 
-Comandos previstos desde la raíz del repositorio:
+Comandos locales desde la raíz del repositorio:
 
 ```bash
 node odoo_addons/lba_print_connector/tests/test_lba_templates.mjs
 python3 -m compileall -q odoo_addons/lba_print_connector
-# El workflow de GitHub instala Odoo 19 y ejecuta los TransactionCase.
 ```
 
-El estado de cada comando y la ejecución real de `pytest`, GitHub Actions, instalación, navegador/E2E y hardware se registra en [`ODOO_VALIDACION.md`](ODOO_VALIDACION.md). No atribuir al addon validación de instalación hasta que haya evidencia de Odoo en ejecución.
+La instalación limpia y actualización del addon ya pasaron en CI con Odoo 19.0
+y PostgreSQL 16 ([run 45237021879](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45237021879),
+SHA `d3c99b323c78af9b1bedcfa4f635391e44a3d0fe`). Eso verifica carga de modelos,
+datos, ACL, vistas y TransactionCase en las bases aisladas del workflow; no
+verifica todavía el patch OWL en navegador, el TPV conectado a un servidor LBA
+real/simulado, ni una impresora física. El detalle de evidencia y límites está
+en [`ODOO_VALIDACION.md`](ODOO_VALIDACION.md).
 
 ## 8. Límites explícitos
 
