@@ -21,7 +21,7 @@ class LbaPrintDepartment(models.Model):
 
     name = fields.Char(required=True, translate=True)
     code = fields.Char(required=True, help="caja / cocina / pizzeria / bar / "
-                                       "salon / personalizados")
+                                           "salon / personalizados")
     sequence = fields.Integer(default=10)
     active = fields.Boolean(default=True)
     printer_ids = fields.Many2many(
