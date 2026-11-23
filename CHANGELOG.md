@@ -3,7 +3,18 @@
 Formato: por fase, con objetivos → entregables → pruebas → pendientes.
 Rama de trabajo actual: `fix/odoo19-addon-qa-layouts`; la fundación `feature/lba-print-foundation` no se modificó.
 
-## Continuación de auditoría/estabilización — 2026-11-23 (QA local, sin release)
+## Corrección de CI Odoo y artefactos QA — 2026-11-23 (sin release)
+
+- En el commit de código `49f7249be25e518844de6d7fb5ea427ef08ef7dc` se corrigieron tres fixtures `res.users` que utilizaban el campo inexistente `groups_id`; Odoo 19 en el commit oficial fijado `62c2f793058de87ff453532f206a96a1e71845d2` declara `group_ids` (`odoo/addons/base/models/res_users.py:257`). El test de `action_process_now` usa `autospec=True` para verificar el recordset seleccionado sin cambiar el método productivo ni sus controles.
+- Evidencia local: servidor **60 passed, 46 warnings**; deploy **22 passed**; Node **2/2 passed**; recursos del manifest, AST de tests Python, XML y `git diff --check` correctos.
+- El [CI servidor 45285525809](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45285525809) y el [CI Odoo 19 45285525821](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45285525821) terminaron `success` en el mismo SHA. Servidor pasó pytest, deploy, Node, smoke con simulador y build. Odoo pasó instalación limpia y actualización en base separada; cada log de tests registra 0 fallos/errores en 28 tests.
+- Observación de conteo Odoo: cada log tiene 28 líneas `Starting Test` y `odoo.tests.result` informa 28; `odoo.tests.stats` informa 36 tests. Se conserva la discrepancia en `docs/ODOO_VALIDACION.md`; no se infiere cobertura adicional. Errores SQL de unicidad de las pruebas dentro de savepoints fueron intencionales y no produjeron fallos.
+- Los dos runs generaron paquetes QA idénticos para ese commit. `MANIFEST.txt` SHA-256 `9f609df249f9a77033eae2224457824394b7b79da00277b4bd437a411677ac90`; TAR SHA-256 `2d2159ab37fb0dcbdaa7bd6ca92dd5c30364558e407596a55b346237723ce1cd`; ZIP SHA-256 `99b9ee38541ac2ac1911c3e7100328c5ee173eb7256b84fc6c346000006a5147`. `sha256sum -c` pasó en las dos descargas, los manifiestos coincidieron y `BUILD-INFO.txt` identifica el SHA exacto. ZIP/TAR abren y contienen el módulo/archivos requeridos.
+- Estos son paquetes de QA, no una release estable ni evidencia de instalación en Debian 12/LXC. No hubo despliegue, PR, merge, acceso a producción, escaneo LAN ni comandos a impresoras.
+
+## Captura previa a la finalización de CI — 2026-11-23 (histórica, QA local)
+
+La subsección siguiente conserva la fotografía tomada antes de completar la ejecución del nuevo SHA. Sus notas que decían «CI pendiente» y «paquetes actuales pendientes» quedan superadas por la sección anterior; sus pruebas locales siguen siendo históricas válidas.
 
 - En la rama `fix/odoo19-addon-qa-layouts`, sobre HEAD base `7ae0857d6ae9cf50f4d1c6470fe54171527e34ed`, se reparó el staging de restore para no cambiar `/etc` y normalizar permisos; backup rechaza symlinks/hardlinks; ACL y guard ORM bloquean creación POS directa incluso para responsables y solo managers/admin editan rutas de departamentos; el controlador eleva tras validar sesión/configuración; 409 remoto exige ID y estado conocido; health consulta SQLite; reimpresión de impresora archivada se rechaza; idempotencia resuelve errores de concurrencia SQLite; claim y evento se confirman juntos; walkthrough usa temporales privados y limpieza por defecto.
 - Evidencia local reejecutada: servidor **60 passed, 46 warnings**; despliegue **22 passed** con rutas temporales/mocks (incluye casos Proxmox simulados); Node **2 archivos passed**. Bash `-n` validó **8 scripts**, compileall/AST Python **55 archivos**, parseo XML **11 archivos**, PyYAML **2 workflows** y `git diff --check` pasó. Las pruebas no equivalen a Proxmox real, LXC, runtime Odoo, navegador ni hardware.

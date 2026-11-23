@@ -13,15 +13,23 @@ Esta rama (`fix/odoo19-addon-qa-layouts`) está en QA. No instalarla ni correr m
 | Sintaxis de vistas XML | **Verificado localmente** | Parseo XML de todos los archivos del addon pasó; no sustituye carga de vistas en Odoo. |
 | Sintaxis YAML de workflows | **Verificado localmente** | PyYAML parseó `.github/workflows/*.yml` sin errores; esto no valida la semántica de GitHub Actions ni reemplaza ejecutar el workflow editado. |
 | Recursos de datos del manifest | **Verificado en CI** | Los 12 paths declarados existen y el paso de validación del manifest pasó. Los tres XML excluidos por el patrón antiguo de `.gitignore` ya están versionados. |
-| Pruebas del servidor LBA (`pytest`) | **Verificado localmente** | Suite completa reejecutada: **60 passed, 46 warnings**, Python 3.12 sandbox. [Run CI 45239085620](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45239085620) es `success` en SHA base `7ae0857d6ae9cf50f4d1c6470fe54171527e34ed`, no en los cambios locales. |
-| Suite de despliegue | **Verificado localmente** | `python3 -m unittest discover -s deploy/tests -v`: 22 passed; incluye mocks Proxmox y rutas temporales/sudo, no Proxmox ni LXC/systemd real. |
-| Whitespace/conflictos del diff | **Verificado localmente** | `git diff --check` reejecutado después de actualizar la auditoría y los documentos de QA; pasó sin errores. |
-| Instalación limpia Odoo 19 / TransactionCase | **No ejecutado para código local** | Hay nuevos tests TransactionCase para bypass ORM POS y 409 sin job identificable, pero no se ejecutaron localmente. [Run 45239085651](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45239085651) está verde solo en SHA base `7ae0857d6ae9cf50f4d1c6470fe54171527e34ed`; no valida esos cambios. |
-| Actualización del addon en base separada | **No ejecutado para código local** | El run 45239085651 corresponde al SHA base indicado; el workflow modificado requiere un run nuevo en el SHA del código revisado. |
+| Pruebas del servidor LBA (`pytest`) | **Verificado localmente y en CI** | Suite local: **60 passed, 46 warnings**. [Run CI 45285525809](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45285525809) es `success` sobre SHA `49f7249be25e518844de6d7fb5ea427ef08ef7dc`. |
+| Suite de despliegue | **Verificado localmente y en CI** | `python3 -m unittest discover -s deploy/tests -v`: 22 passed; CI servidor pasó el mismo paso. Incluye mocks Proxmox y rutas temporales, no Proxmox ni LXC/systemd real. |
+| Whitespace/conflictos del diff | **Verificado localmente** | `git diff --check` pasó después de las modificaciones actuales de README, CHANGELOG y documentos de QA. |
+| Instalación limpia Odoo 19 / TransactionCase | **Verificado en CI** | [Run 45285525821](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45285525821), SHA `49f7249be25e518844de6d7fb5ea427ef08ef7dc`: resumen `0 failed, 0 error(s) of 28 tests`; se verificaron los fixtures Odoo 19 `group_ids` y el despacho selectivo. |
+| Actualización del addon en base separada | **Verificado en CI** | El mismo run instaló una versión base en `lba_odoo19_upgrade` y ejecutó `-u lba_print_connector` más TransactionCase: resumen `0 failed, 0 error(s) of 28 tests`. No equivale a upgrade sobre datos de producción. |
+| Paquetes QA Odoo/servidor | **Verificados para QA** | Runs `45285525809` y `45285525821` generaron archivos byte-a-byte idénticos para el SHA anterior; `SHA256SUMS` pasó en ambos. ZIP SHA-256 `99b9ee38541ac2ac1911c3e7100328c5ee173eb7256b84fc6c346000006a5147`; TAR SHA-256 `2d2159ab37fb0dcbdaa7bd6ca92dd5c30364558e407596a55b346237723ce1cd`. No es release estable ni instalación en LXC. |
 | Navegador OWL y flujo TPV | **No verificado** | El CI no abre el navegador. Probar recibo, comanda, deltas, reimpresión, enrutamiento, fallback y rutas nativas en POS Odoo de desarrollo. |
 | E2E Odoo ↔ servidor LBA | **No verificado** | El CI del servidor usa su propio simulador; no conecta el addon instalado a una instancia LBA. Probar desconexión, reintento, concurrencia y estados en ambiente aislado. |
 | Varios workers Odoo / doble reclamo | **No verificado** | `FOR UPDATE SKIP LOCKED` está presente; aún falta prueba concurrente que lance varios workers sobre la misma cola. |
 | Hardware Volcora / impresoras físicas | **No verificado** | No probar hasta conocer modelo, interfaz y protocolo; no escanear LAN indiscriminadamente. |
+
+Los logs Odoo fueron descargados de `45285525821`. En ambos logs, instalación y
+actualización, hay 28 entradas `Starting Test` y el resumen `odoo.tests.result`
+informa 0 fallos/errores de 28 tests. La línea `odoo.tests.stats` informa 36
+tests; esa diferencia de contadores se conserva como observación del log, sin
+convertirla en una afirmación de cobertura adicional. También aparecen errores
+SQL de unicidad esperados en tests con savepoints; no son fallos del run.
 
 Las pruebas del servidor validan el servicio LBA y su simulador, no el flujo conectado desde el addon Odoo. La evidencia CI de instalación/upgrade tampoco valida el comportamiento OWL del navegador ni papel físico.
 

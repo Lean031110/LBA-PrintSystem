@@ -61,21 +61,27 @@ node --test odoo_addons/lba_print_connector/tests/*.mjs
 
 ### Estado de QA del addon Odoo
 
-El trabajo está en `fix/odoo19-addon-qa-layouts`. En esta reevaluación se
-ejecutaron localmente 60 tests del servidor, 22 pruebas de despliegue aisladas,
-y dos archivos Node del addon, además de validaciones sintácticas Python/XML,
-`bash -n` y `git diff --check`. El HEAD remoto/base `7ae0857d6ae9cf50f4d1c6470fe54171527e34ed`
-tiene [CI de Odoo](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45239085651)
-y [CI de servidor](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45239085620)
-verdes; ambos corresponden solo a ese SHA. Los cambios actuales están separados
-en commits QA locales y aún requieren push para obtener CI del nuevo código;
-no hay paquetes finales de esa revisión.
+El código QA de esta rama fue probado en el commit
+`49f7249be25e518844de6d7fb5ea427ef08ef7dc`. El
+[workflow del servidor](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45285525809)
+y el [workflow Odoo 19](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45285525821)
+terminaron `success` sobre ese SHA. Odoo pasó instalación limpia y actualización
+en bases separadas; el resumen final de cada ejecución registra 0 fallos y 0
+errores en 28 tests.
 
-Esto no valida TransactionCase del código local actual, el patch OWL en
-navegador, el flujo integrado Odoo↔servidor LBA, instalación en LXC ni
-impresión física. La matriz con evidencia y pendientes está en
-[docs/ODOO_VALIDACION.md](docs/ODOO_VALIDACION.md). No instalar esta rama ni
-ejecutar migraciones en la base real de Lo D’ Leo.
+Ambos workflows publicaron los paquetes QA para ese SHA. Los artefactos
+descargados de los dos runs son idénticos, sus checksums SHA-256 y estructuras
+ZIP/TAR se verificaron y `BUILD-INFO.txt` identifica el commit probado. Son
+artefactos de QA, no una release estable ni evidencia de instalación en Debian
+12/LXC.
+
+En sandbox también pasaron 60 tests del servidor (46 warnings), 22 pruebas de
+despliegue aisladas, 2 archivos Node, validación del manifest, AST Python,
+parseo XML y `git diff --check`. No se han verificado navegador OWL/TPV,
+integración E2E Odoo↔LBA, LXC/systemd real, estrés multiproceso, TLS/cookie
+Secure, operación offline bloqueando egress ni hardware físico. La matriz de
+evidencia está en [docs/ODOO_VALIDACION.md](docs/ODOO_VALIDACION.md); no instalar
+esta rama ni ejecutar migraciones en la base real de Lo D’ Leo.
 
 ## Estructura
 

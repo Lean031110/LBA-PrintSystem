@@ -2,11 +2,13 @@
 
 > Regla del encargo nº 11: antes de cada fase se documentan objetivos y criterios de aceptación; al terminar, archivos creados, pruebas y pendientes (eso se registra en `CHANGELOG.md`).
 
-## Auditoría de estabilización — 2026-11-23 (QA local, no release)
+## Auditoría de estabilización — 2026-11-23 (QA con CI, no release)
 
-La reevaluación local más reciente ejecutó **60 tests del servidor**, **22 pruebas de despliegue** aisladas con mocks/temporales y los **2 archivos Node** del addon; la corrección de restore, guard de creación ORM para POS/manager, ACL de departamentos, validación de 409 con estado explícito, readiness, reimpresión archivada, idempotencia SQLite y claim/evento se documenta con evidencia en `FINAL_AUDIT.md`. Los scripts no se instalaron en LXC/systemd real y Odoo TransactionCase/OWL no se ejecutaron para este árbol. Los workflows ahora incluyen la suite deploy y ambos archivos Node, pero esa revisión de CI aún no se ha ejecutado.
+El commit de código QA `49f7249be25e518844de6d7fb5ea427ef08ef7dc` pasó los dos workflows de GitHub: servidor [45285525809](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45285525809) y Odoo 19 [45285525821](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45285525821). El gate servidor pasó pytest, deploy, Node, smoke con simulador y empaquetado; el gate Odoo pasó instalación limpia, 28 TransactionCase, actualización en una segunda base, otros 28 TransactionCase y empaquetado. Los ZIP/TAR de ambos workflows se descargaron, sus checksums pasaron y los builds coincidieron byte a byte.
 
-**No declarar versión estable ni integrar en `main`** hasta cerrar: CI de la revisión actual, TransactionCase en Odoo 19/PostgreSQL, instalación Debian 12/LXC con systemd, navegador OWL/TPV y E2E Odoo→LBA→simulador, estrés multiproceso, validación de HTTPS/cookie, build reproducible y hashes del SHA probado, más gates físicos autorizados. La identidad criptográfica de plantillas Proxmox locales, reconciliación de CTID existente, dependencias con lock/hash, matriz de plataformas, renderer `profile`/`density`, TLS y release estable siguen pendientes.
+La suite local reejecutada pasó **60 tests del servidor** (46 warnings), **22 pruebas de despliegue** aisladas y **2 archivos Node**; también pasaron AST Python, manifest, parseo XML y `git diff --check`. Eso no valida OWL/TPV en navegador, integración E2E Odoo→LBA→simulador, LXC/systemd real, estrés multiproceso, TLS/cookie Secure, operación offline bloqueando egress ni impresión física. Se registró en `FINAL_AUDIT.md` la evidencia y el límite de recuento observado en los logs Odoo.
+
+**No declarar versión estable ni integrar en `main`** mientras falten los gates de navegador/TPV, E2E, despliegue Debian 12/LXC con systemd, estrés multiproceso, TLS/cookie, offline, validación física autorizada y revisión de seguridad/compatibilidad completa. La identidad de plantillas Proxmox locales, dependencias con lock/hash, matriz de plataformas, renderer `profile`/`density` y workflow de release estable también siguen pendientes. No se desplegó producción.
 
 ## Fase 0 — Investigación obligatoria ✅ HECHA
 

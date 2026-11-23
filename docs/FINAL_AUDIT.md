@@ -1,6 +1,6 @@
-# Auditoría final — borrador inicial
+# Auditoría final — evidencia QA y límites
 
-> **Informe actualizado tras correcciones locales.** Las secciones A–F conservan hallazgos y causas del baseline `7ae0857d6ae9cf50f4d1c6470fe54171527e34ed`; las líneas originales “Resultado actual” describen ese baseline. La sección “Reevaluación posterior” más los hallazgos adicionales G1–G11 es la fuente de estado vigente. No representa aprobación de producción ni gate de release.
+> **La actualización de evidencia más reciente está en el addendum final de CI.** Las secciones A–F conservan los hallazgos y causas del baseline `7ae0857d6ae9cf50f4d1c6470fe54171527e34ed`; las líneas originales “Resultado actual” describen ese baseline. La reevaluación previa y los hallazgos G1–G11 son contexto de cambios anteriores. El addendum final prevalece para el estado actual de CI/artefactos; nada de ello constituye aprobación de producción ni gate de release.
 
 ## Contexto y alcance
 
@@ -566,3 +566,47 @@ Esta sección complementa los 41 hallazgos A1–F5; no los reemplaza. Los result
 - Estáticos reejecutados: `bash -n` → **8 scripts OK**; YAML de **2 workflows** parseado con PyYAML instalado en `/tmp` (sin editar dependencias del repo); `git diff --check` OK. Scripts ejecutables mantienen modo 0755; `lib_common.sh` es biblioteca y modo 0644.
 - CI externo leído por `gh`: [server run 45239085620](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45239085620), [Odoo run 45239085651](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45239085651), ambos `success` en `7ae0857...` únicamente.
 - El empaquetador fue comparado dos veces en el SHA base; no genera artefactos desde un checkout sucio por diseño. Los paquetes de QA finales dependen de commit limpio y workflows nuevos.
+
+
+## Addendum de evidencia CI y artefactos QA — 2026-11-23
+
+Este addendum es la fuente vigente para el estado de CI y empaquetado; los estados anteriores de E2/E3/E5/E7 y de C1/C2/C4/C5 deben leerse como capturas previas. Los workflows aquí citados prueban exactamente el commit de código `49f7249be25e518844de6d7fb5ea427ef08ef7dc` en `fix/odoo19-addon-qa-layouts`. No se modificaron `main` ni `feature/lba-print-foundation`, no se abrió PR y no se desplegó producción.
+
+### Corrección Odoo 19 y resultados
+
+La fuente oficial de Odoo fijada por CI declara `res.users.group_ids` en [res_users.py, commit 62c2f793058de87ff453532f206a96a1e71845d2, líneas 257–259](https://github.com/odoo/odoo/blob/62c2f793058de87ff453532f206a96a1e71845d2/odoo/addons/base/models/res_users.py#L257-L259), no `groups_id`. Se corrigieron los tres fixtures afectados en los tests de departamentos, job y servidor. El test de `action_process_now` se ajustó con `autospec=True` para verificar el recordset seleccionado y el argumento `self`; el método productivo y los controles de acceso no se debilitaron.
+
+| Gate | Run | SHA | Resultado observado |
+|---|---|---|---|
+| Servidor, despliegue, Node, smoke y empaquetado | [45285525809](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45285525809) | `49f7249be25e518844de6d7fb5ea427ef08ef7dc` | `success`; steps de pytest, deploy, Node, smoke con simulador, build y upload completados. |
+| Instalación Odoo, TransactionCase, upgrade y empaquetado | [45285525821](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45285525821) | `49f7249be25e518844de6d7fb5ea427ef08ef7dc` | `success`; instalación limpia y actualización en una segunda base aislada, cada una con resumen `0 failed, 0 error(s) of 28 tests`. |
+
+Los logs descargados registran 28 líneas `Starting Test` tanto en instalación como en actualización. En ambos, `odoo.tests.result` informa 0 fallos/errores de 28 tests; la línea agregada `odoo.tests.stats` informa 36 tests. Esta discrepancia de conteo se deja explícita y no se interpreta como cobertura adicional. Los `ERROR` SQL de violación de unicidad son provocados por tests dentro de savepoints y el resumen final de Odoo confirma 0 tests fallidos y 0 errores. La ejecución cubre los TransactionCase definidos; no valida el TPV/OWL en navegador ni un flujo conectado con LBA.
+
+### Verificación de artefactos
+
+Ambos workflows publicaron `lba-packages-49f7249be25e518844de6d7fb5ea427ef08ef7dc`. Las descargas desde los dos runs tienen manifiesto, TAR y ZIP idénticos byte a byte. `sha256sum -c SHA256SUMS` pasó en cada descarga; se abrieron los dos formatos y se verificaron la raíz `lba_print_connector/`, recursos del módulo, scripts/servicios del servidor y `BUILD-INFO.txt`, que identifica exactamente el SHA anterior. Los hashes son:
+
+| Archivo | SHA-256 |
+|---|---|
+| `MANIFEST.txt` | `9f609df249f9a77033eae2224457824394b7b79da00277b4bd437a411677ac90` |
+| `lba-print-server-debian12-amd64.tar.gz` | `2d2159ab37fb0dcbdaa7bd6ca92dd5c30364558e407596a55b346237723ce1cd` |
+| `lba_print_connector-19.0.1.0.0.zip` | `99b9ee38541ac2ac1911c3e7100328c5ee173eb7256b84fc6c346000006a5147` |
+
+Comprobaciones reproducibles localmente para este corte: suite servidor **60 passed, 46 warnings**; suite deploy **22 passed**; Node **2/2 passed**; manifest declara 12 recursos existentes, AST de tests Python y parseo XML pasaron, `git diff --check` pasó tras la actualización documental. El TAR/ZIP son artefactos de QA; no se instalaron en un LXC Debian 12 ni se publicaron como release.
+
+### Reevaluación de hallazgos tocados por este run
+
+| Hallazgo | Estado actualizado | Evidencia y límite |
+|---|---|---|
+| C1 — autorización/ACL de creación POS | Parcial con TransactionCase verificado | El test de creación directa por POS user y POS manager pasó en las dos ejecuciones de 28 tests. El flujo autorizado vía navegador TPV y E2E sigue pendiente. |
+| C2 — acción manual de procesamiento | Parcial con TransactionCase verificado | La prueba de manager y despacho limitado a registros seleccionados pasó; petición HTTP real en la integración Odoo↔LBA no se ejecutó. |
+| C4 — reconciliación de 409 | Parcial con TransactionCase verificado | Casos con respuesta sin job y con ID sin status pasaron; el transporte remoto está mockeado, no es E2E. |
+| C5 — acciones ACL de servidor | Parcial con TransactionCase verificado | La regresión de usuario POS solo lectura pasó; validación visual de menús/acciones y permisos en navegador queda pendiente. |
+| E2/E3 — pipeline y pin upstream Odoo | Corregido/verificado para este workflow | CI instala dependencias, usa el upstream SHA fijo y completó instalación más upgrade en PostgreSQL 16. No demuestra soporte en otras combinaciones de plataformas. |
+| E5 — empaquetado | Parcial, gate de artefactos QA superado | Builds de dos workflows idénticos, hashes y contenido verificados; faltan instalación desde paquete en Debian/LXC real, descarga por usuario y proceso de release. |
+| E7 — atribución CI a SHA | Corregido para el commit citado | Ambos runs concluyeron `success` y registran el mismo SHA `49f7249...`; los runs anteriores citados en secciones históricas no se reutilizan como evidencia de este SHA. |
+
+### Gates que continúan pendientes
+
+No se ejecutaron navegador OWL/TPV, Playwright, integración E2E Odoo→LBA→worker→impresora virtual, stress de varios procesos/claims, caída entre `sendall` y commit, instalación/actualización/reinicio en LXC Debian 12 con systemd real, `systemd-analyze verify` en ese entorno, bloqueo de egress para probar offline, revisión efectiva de TLS/SAN/cookie `Secure`/firewall, ni pruebas físicas autorizadas. Tampoco se accedió a la base de datos de Lo D’ Leo, se hizo escaneo LAN o se enviaron comandos a impresoras. No se declara que `sent` signifique papel impreso, no se integra en `main` y no se publica una release estable.
