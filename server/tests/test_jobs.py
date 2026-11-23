@@ -42,6 +42,49 @@ def test_idempotencia_misma_clave_no_duplica(client: TestClient, auth_headers):
     assert lst["count"] == 1
 
 
+def test_idempotency_key_rechaza_impresora_o_payload_distinto(
+        client: TestClient, auth_headers):
+    first_printer = _printer(client, auth_headers, "IdemPrimera")
+    other_printer = _printer(client, auth_headers, "IdemSegunda")
+    key = "odoo:orden:documento-fijo"
+    original = _job(first_printer, key)
+    created = client.post("/api/v1/jobs", headers=auth_headers, json=original)
+    assert created.status_code == 202
+
+    wrong_printer = client.post("/api/v1/jobs", headers=auth_headers,
+                                json=_job(other_printer, key))
+    assert wrong_printer.status_code == 409
+    assert "otra impresora o payload" in wrong_printer.json()["detail"]
+
+    changed = _job(first_printer, key)
+    changed["document"]["blocks"][0]["value"] = "contenido diferente"
+    wrong_payload = client.post("/api/v1/jobs", headers=auth_headers,
+                                json=changed)
+    assert wrong_payload.status_code == 409
+    assert "otra impresora o payload" in wrong_payload.json()["detail"]
+    jobs = client.get("/api/v1/jobs", headers=auth_headers,
+                      params={"printer_id": first_printer}).json()
+    assert jobs["count"] == 1
+
+
+def test_borrado_impresora_conserva_job_y_eventos(client: TestClient,
+                                                 auth_headers):
+    pid = _printer(client, auth_headers, "ArchivoAPI")
+    jid = client.post("/api/v1/jobs", headers=auth_headers,
+                      json=_job(pid)).json()["id"]
+    assert client.post(f"/api/v1/jobs/{jid}/cancel",
+                       headers=auth_headers).status_code == 200
+    deleted = client.delete(f"/api/v1/printers/{pid}", headers=auth_headers)
+    assert deleted.status_code == 200
+    assert deleted.json()["archived"] is True
+    history = client.get(f"/api/v1/jobs/{jid}", headers=auth_headers)
+    assert history.status_code == 200
+    assert history.json()["status"] == "cancelled"
+    assert history.json()["printer_name"] == "ArchivoAPI"
+    assert any(event["to"] == "cancelled" for event in history.json()["events"])
+    assert client.get(f"/api/v1/printers/{pid}", headers=auth_headers).status_code == 404
+
+
 def test_payload_invalido_rechazado(client: TestClient, auth_headers):
     pid = _printer(client, auth_headers, name="ImpPayload")
     # bloque desconocido
@@ -89,6 +132,25 @@ def test_reprint_crea_job_nuevo(client: TestClient, auth_headers):
     lst = client.get("/api/v1/jobs", headers=auth_headers,
                      params={"printer_id": pid}).json()
     assert lst["count"] == 2
+
+
+def test_reprint_de_impresora_archivada_rechazado(client: TestClient, auth_headers):
+    pid = _printer(client, auth_headers, name="ImpReprintArchivada")
+    created = client.post("/api/v1/jobs", headers=auth_headers,
+                          json=_job(pid)).json()
+    cancelled = client.post(f"/api/v1/jobs/{created['id']}/cancel",
+                            headers=auth_headers)
+    assert cancelled.status_code == 200
+    archived = client.delete(f"/api/v1/printers/{pid}", headers=auth_headers)
+    assert archived.status_code == 200
+
+    response = client.post(f"/api/v1/jobs/{created['id']}/reprint",
+                           headers=auth_headers)
+    assert response.status_code == 409
+    assert "archivada o inactiva" in response.json()["detail"]
+    jobs = client.get("/api/v1/jobs", headers=auth_headers,
+                      params={"printer_id": pid}).json()
+    assert jobs["count"] == 1
 
 
 def test_cancel_pendiente(client: TestClient, auth_headers):

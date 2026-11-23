@@ -33,7 +33,7 @@ class Printer(Base):
     paper_width_mm = Column(Integer, default=80, nullable=False)   # 58 | 80
     columns = Column(Integer, default=48, nullable=False)           # 32 | 48
     encoding = Column(String(20), default=config.DEFAULT_ENCODING, nullable=False)
-    status = Column(String(20), default="unknown", nullable=False)  # unknown|online|offline
+    status = Column(String(20), default="unknown", nullable=False)  # unknown|online|offline|deleted
     last_seen_at = Column(DateTime, nullable=True)
     last_error = Column(Text, default="", nullable=False)
     notes = Column(Text, default="", nullable=False)
@@ -57,6 +57,8 @@ class Job(Base):
     attempts = Column(Integer, default=0, nullable=False)
     max_attempts = Column(Integer, default=config.MAX_ATTEMPTS_DEFAULT, nullable=False)
     next_attempt_at = Column(DateTime, default=utcnow, nullable=False, index=True)
+    # Lease temporal del claim del worker; NULL fuera de processing.
+    claim_expires_at = Column(DateTime, nullable=True)
     last_error = Column(Text, default="", nullable=False)
     bytes_hex = Column(Text, nullable=True)            # bytes ESC/POS enviados (auditoría)
     bytes_len = Column(Integer, default=0, nullable=False)
@@ -117,6 +119,16 @@ def set_setting(db, key: str, value: Any) -> None:
 
 def audit(db, ip: str, subject: str, action: str, detail: Optional[dict] = None) -> None:
     db.add(AuditLog(ip=ip, subject=subject, action=action, detail=detail or {}))
+
+
+def archive_printer(db, printer: Printer) -> None:
+    """Desactiva y anonimiza el destino, reteniendo la fila referenciada por jobs."""
+    printer.status = "deleted"
+    printer.active = 0
+    printer.ip = ""
+    printer.last_error = ""
+    printer.notes = ""
+    printer.settings = {}
 
 
 def ensure_default_settings(db) -> dict:
@@ -190,11 +202,21 @@ def purge_expired(db, retention_days: int) -> int:
 
 
 def recover_orphan_processing(db) -> int:
-    """Worker arranca: trabajos 'processing' huérfanos vuelven a 'pending'."""
-    orphans = db.query(Job).filter(Job.status == "processing").all()
+    """Reencola solo claims vencidos; entrega at-least-once, no exactly-once.
+
+    Si el worker cayó después de que el dispositivo recibiera el ticket y antes
+    de persistir `sent`, no puede saberse si hubo impresión física; la
+    recuperación puede duplicarla. Las conexiones de impresión están acotadas
+    por timeout y el claim tiene un lease más largo que esa operación.
+    """
+    now = utcnow()
+    orphans = (db.query(Job).filter(Job.status == "processing")
+               .filter((Job.claim_expires_at.is_(None)) |
+                       (Job.claim_expires_at <= now)).all())
     for j in orphans:
         j.status = "pending"
-        j.next_attempt_at = utcnow()
+        j.next_attempt_at = now
+        j.claim_expires_at = None
         db.add(JobEvent(job_id=j.id, from_status="processing", to_status="pending",
-                        detail="recuperado tras reinicio del worker"))
+                        detail="claim vencido recuperado; entrega at-least-once"))
     return len(orphans)

@@ -95,12 +95,19 @@ def render_preview(data: bytes, codec: str = "cp850", columns: int = 48) -> str:
                     i += 1 + min(k, 255)
             elif c == 0x28:        # GS ( k (QR y otros)
                 flush()
-                lines.append("[QR]")
-                i += 2
-                if i + 3 < n and data[i:i + 2] == b"\x6b":
-                    i += 8  # pL pH cn fn + datos (aprox)
+                if i + 2 < n and data[i + 2] == 0x6B:
+                    lines.append("[QR]")
                 else:
-                    i += 8
+                    lines.append("[COMANDO GS( )]")
+                if i + 4 < n:
+                    # GS ( k pL pH ...: pL/pH cuentan los bytes a continuación
+                    # (incluidos cn/fn). No interpretar el payload como texto.
+                    length = data[i + 3] + (data[i + 4] << 8)
+                    i = min(n, i + 5 + length)
+                else:
+                    # Cabecera incompleta: conservar el preview best-effort y
+                    # no exponer bytes binarios restantes como si fueran texto.
+                    i = n
             elif c == 0x76:        # GS v 0 raster
                 if i + 7 < n and data[i + 2] in (0x30, 0x31, 0x00, 0x01):
                     xL, xH, yL, yH = data[i + 3], data[i + 4], data[i + 5], data[i + 6]

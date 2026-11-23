@@ -121,7 +121,9 @@ def logout():
 def dashboard(request: Request, db: Session = Depends(get_db)):
     if (r := _require(request)):
         return r
-    printers = db.query(models.Printer).order_by(models.Printer.name).all()
+    printers = (db.query(models.Printer)
+                .filter(models.Printer.status != "deleted")
+                .order_by(models.Printer.name).all())
     last_jobs = (db.query(models.Job).order_by(models.Job.created_at.desc())
                  .limit(10).all())
     errors = (db.query(models.Job).filter(models.Job.status == "failed")
@@ -140,7 +142,9 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
 def devices(request: Request, db: Session = Depends(get_db)):
     if (r := _require(request)):
         return r
-    items = db.query(models.Printer).order_by(models.Printer.created_at).all()
+    items = (db.query(models.Printer)
+             .filter(models.Printer.status != "deleted")
+             .order_by(models.Printer.created_at).all())
     return _render(request, db, "devices.html", {"printers": items})
 
 
@@ -210,11 +214,18 @@ def devices_delete(printer_id: str, request: Request,
         if pending:
             _flash(request, "Hay trabajos en cola para esa impresora.", "err")
         else:
-            db.delete(p)
+            has_history = db.query(models.Job.id).filter(
+                models.Job.printer_id == p.id).first() is not None
+            if has_history:
+                models.archive_printer(db, p)
+            else:
+                db.delete(p)
             models.audit(db, security.get_client_ip(request), "admin",
-                         "printer.delete", {"id": printer_id})
+                         "printer.delete", {"id": printer_id,
+                                             "archived": has_history})
             db.commit()
-            _flash(request, "Impresora eliminada.")
+            _flash(request, "Impresora archivada; se conserva el historial."
+                    if has_history else "Impresora eliminada.")
     return RedirectResponse("/devices", status_code=303)
 
 
@@ -224,7 +235,7 @@ def devices_toggle(printer_id: str, request: Request,
     if (r := _require(request)):
         return r
     p = db.get(models.Printer, printer_id)
-    if p:
+    if p and p.status != "deleted":
         p.active = 0 if p.active else 1
         db.commit()
     return RedirectResponse("/devices", status_code=303)
@@ -232,7 +243,7 @@ def devices_toggle(printer_id: str, request: Request,
 
 def _get_printer_or_404(db: Session, pid: str) -> models.Printer:
     p = db.get(models.Printer, pid)
-    if p is None:
+    if p is None or p.status == "deleted":
         raise HTTPException(404, "impresora no encontrada")
     return p
 
@@ -275,10 +286,11 @@ def device_save(printer_id: str, request: Request,
     p.encoding = encoding
     p.notes = notes
     p.active = 1 if active else 0
+    current_settings = p.settings if isinstance(p.settings, dict) else {}
     p.settings = {
         "cut": bool(cut), "feed_before_cut": feed_before_cut,
         "density": None if density == -99 else density,
-        "logo": bool(p.settings or {}).get("logo", False),
+        "logo": bool(current_settings.get("logo", False)),
         "qr_size": qr_size,
     }
     models.audit(db, security.get_client_ip(request), "admin",
@@ -311,6 +323,9 @@ async def discover_run(request: Request, cidr: str = Form(...),
     except ValueError:
         port_list = [9100]
     try:
+        discovery.validate_configured_range(
+            cidr.strip(), models.get_setting(db, "discovery_ranges",
+                                             config.DEFAULT_DISCOVERY_RANGES))
         results = await discovery.scan(cidr.strip(), port_list[:6])
         models.audit(db, security.get_client_ip(request), "admin",
                      "printers.discover", {"cidr": cidr, "found": len(results)})
@@ -328,7 +343,9 @@ async def discover_run(request: Request, cidr: str = Form(...),
 def test_print_form(request: Request, db: Session = Depends(get_db)):
     if (r := _require(request)):
         return r
-    items = db.query(models.Printer).order_by(models.Printer.name).all()
+    items = (db.query(models.Printer)
+             .filter(models.Printer.status != "deleted", models.Printer.active == 1)
+             .order_by(models.Printer.name).all())
     return _render(request, db, "test_print.html", {"printers": items})
 
 

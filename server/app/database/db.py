@@ -4,7 +4,8 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, inspect, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.core import config
@@ -69,6 +70,20 @@ def init_db() -> None:
     """Crea tablas e inserta valores por defecto (idempotente)."""
     from app.models import models  # noqa: F401  (registra los ORM)
     Base.metadata.create_all(bind=get_engine())
+    # create_all no altera tablas existentes: esta columna aditiva permite que
+    # bases previas adopten el lease sin borrar ni reconstruir la cola.
+    columns = {c["name"] for c in inspect(get_engine()).get_columns("jobs")}
+    if "claim_expires_at" not in columns:
+        try:
+            with get_engine().begin() as conn:
+                conn.execute(text(
+                    "ALTER TABLE jobs ADD COLUMN claim_expires_at DATETIME"))
+        except OperationalError:
+            # API y worker pueden arrancar juntos; acepta solo si el otro
+            # proceso ya aplicó exactamente esta migración aditiva.
+            columns = {c["name"] for c in inspect(get_engine()).get_columns("jobs")}
+            if "claim_expires_at" not in columns:
+                raise
     with get_sessionmaker()() as db:
         models.ensure_default_settings(db)
         db.commit()

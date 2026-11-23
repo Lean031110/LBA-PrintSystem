@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import os
+from unittest.mock import Mock, patch
 
+from sqlalchemy.exc import OperationalError
 from app.database.db import get_engine, get_sessionmaker
 from app.models import models
 from app.schemas import schemas as S
@@ -49,6 +51,39 @@ def test_wal_activado():
     mode = con.execute("PRAGMA journal_mode").fetchone()[0]
     con.close()
     assert mode.lower() == "wal"
+
+
+def test_idempotencia_resuelve_colision_sqlite_a_job_ganador():
+    db = get_sessionmaker()()
+    try:
+        printer = _add_printer(db)
+        winner, _ = queue_service.enqueue(
+            db, printer, _doc(), origin="odoo", idempotency_key="race:one")
+        db.commit()
+        real_query = db.query
+        initial_miss = Mock()
+        initial_miss.filter.return_value.first.return_value = None
+        calls = 0
+
+        def query_side_effect(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                return initial_miss
+            return real_query(*args, **kwargs)
+
+        with patch.object(db, "query", side_effect=query_side_effect), \
+                patch.object(db, "flush", side_effect=OperationalError(
+                    "INSERT", {}, RuntimeError("database is locked"))):
+            resolved, created = queue_service.enqueue(
+                db, printer, _doc(), origin="odoo", idempotency_key="race:one")
+        assert created is False
+        assert resolved.id == winner.id
+        db.commit()
+        assert db.query(models.Job).filter(
+            models.Job.idempotency_key == "race:one").count() == 1
+    finally:
+        db.close()
 
 
 def test_purga_retencion():

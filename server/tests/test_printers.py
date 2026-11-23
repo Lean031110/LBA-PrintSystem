@@ -68,13 +68,39 @@ def test_ip_invalida_400(client: TestClient, auth_headers):
     assert _create(client, auth_headers, ip="no-es-una-ip").status_code == 400
 
 
-def test_discovery_encuentra_simulador(client: TestClient, auth_headers, simulator):
+def test_discovery_encuentra_simulador(client: TestClient, auth_headers,
+                                       simulator, db):
+    from app.models import models
+    models.set_setting(db, "discovery_ranges", ["127.0.0.0/29"])
+    db.commit()
     r = client.post("/api/v1/printers/discover",
                     json={"cidr": "127.0.0.0/29", "ports": [simulator]},
                     headers=auth_headers)
     assert r.status_code == 200, r.text
     found = r.json()["found"]
     assert any(f["ip"] == "127.0.0.1" and f["port"] == simulator for f in found)
+
+
+def test_discovery_range_fuera_de_config_no_escanea(client: TestClient,
+                                                     auth_headers, db,
+                                                     monkeypatch):
+    from app.models import models
+    from app.services import discovery
+    models.set_setting(db, "discovery_ranges", ["192.168.20.0/24"])
+    db.commit()
+    called = False
+
+    async def no_scan(*args, **kwargs):
+        nonlocal called
+        called = True
+        raise AssertionError("no debe iniciar el escaneo")
+
+    monkeypatch.setattr(discovery, "scan", no_scan)
+    response = client.post("/api/v1/printers/discover", headers=auth_headers,
+                           json={"cidr": "192.168.21.0/24"})
+    assert response.status_code == 400
+    assert "discovery_ranges" in response.json()["detail"]
+    assert called is False
 
 
 def test_discovery_rango_publico_rechazado(client: TestClient, auth_headers):

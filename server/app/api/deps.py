@@ -29,6 +29,9 @@ def check_token(request: Request, db) -> str:
         ip = security.get_client_ip(request)
         models.audit(db, ip, "api", "token.invalid",
                     {"path": request.url.path})
+        # La excepción HTTP aborta la transacción de la petición al cerrar
+        # get_db; confirma solo el evento saneado, nunca el token recibido.
+        db.commit()
         raise HTTPException(401, "Token inválido o revocado")
     return security.token_hash(token)[:12]
 

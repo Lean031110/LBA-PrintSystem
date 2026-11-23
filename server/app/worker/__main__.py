@@ -38,6 +38,7 @@ def process_one(db) -> bool:
     printer = db.get(models.Printer, job.printer_id)
     if printer is None or not printer.active:
         job.status = "failed"
+        job.claim_expires_at = None
         job.last_error = "impresora inexistente o inactiva"
         db.commit()
         return True

@@ -12,15 +12,49 @@ def test_health_publico(client: TestClient):
     assert body["app"] == "LBA Print Server"
     # /health no expone secretos
     assert "token" not in r.text.lower()
+    assert set(body) == {"status", "app", "version", "uptime_s"}
+    assert "printers" not in body and "queue" not in body
+
+
+def test_health_no_disponible_si_sqlite_no_esta_lista(client: TestClient):
+    from sqlalchemy.exc import OperationalError
+    from app.database.db import get_db
+
+    class UnavailableSession:
+        def execute(self, *_args, **_kwargs):
+            raise OperationalError("SELECT", {}, RuntimeError("offline"))
+
+    def failing_db():
+        yield UnavailableSession()
+
+    app = client.app
+    previous = app.dependency_overrides.get(get_db)
+    app.dependency_overrides[get_db] = failing_db
+    try:
+        response = client.get("/api/v1/health")
+    finally:
+        if previous is None:
+            app.dependency_overrides.pop(get_db, None)
+        else:
+            app.dependency_overrides[get_db] = previous
+    assert response.status_code == 503
+    assert response.json() == {"detail": "database unavailable"}
 
 
 def test_sin_token_401(client: TestClient):
     assert client.get("/api/v1/printers").status_code == 401
 
 
-def test_token_invalido_401(client: TestClient):
+def test_token_invalido_401_y_auditoria_persistida(client: TestClient, db):
+    from app.models.models import AuditLog
+
     r = client.get("/api/v1/printers", headers={"Authorization": "Bearer nope"})
     assert r.status_code == 401
+    event = db.query(AuditLog).filter(AuditLog.action == "token.invalid").order_by(
+        AuditLog.id.desc()).first()
+    assert event is not None
+    assert event.detail == {"path": "/api/v1/printers"}
+    assert "nope" not in str(event.detail)
 
 
 def test_ip_no_autorizada_403(client: TestClient, token: str):

@@ -122,6 +122,39 @@ def test_recuperacion_tras_reinicio(db):
     assert job.status == "pending"
 
 
+def test_recuperacion_no_reencola_claim_con_lease_vivo(db):
+    p = _add_printer(db, "E2E-LeaseVivo", "127.0.0.1", 1)
+    job, _ = queue_service.enqueue(db, p, _doc(), origin="test")
+    db.commit()
+    claimed = queue_service.claim_next(db)
+    assert claimed.id == job.id
+    assert claimed.status == "processing"
+    assert claimed.claim_expires_at > utcnow()
+
+    assert models.recover_orphan_processing(db) == 0
+    db.refresh(job)
+    assert job.status == "processing"
+
+
+def test_recuperacion_reencola_claim_vencido(db):
+    from datetime import timedelta
+    p = _add_printer(db, "E2E-LeaseVencido", "127.0.0.1", 1)
+    job, _ = queue_service.enqueue(db, p, _doc(), origin="test")
+    db.commit()
+    claimed = queue_service.claim_next(db)
+    claimed.claim_expires_at = utcnow() - timedelta(seconds=1)
+    db.commit()
+
+    assert models.recover_orphan_processing(db) == 1
+    db.commit()
+    db.refresh(job)
+    assert job.status == "pending"
+    assert job.claim_expires_at is None
+    events = db.query(models.JobEvent).filter(
+        models.JobEvent.job_id == job.id).all()
+    assert any("at-least-once" in event.detail for event in events)
+
+
 def test_claim_no_duplica_con_current_session(db):
     """El claim con UPDATE condicionado evita doble proceso."""
     p = _add_printer(db, "E2E-Claim", "127.0.0.1", 1)
@@ -131,6 +164,11 @@ def test_claim_no_duplica_con_current_session(db):
     # dos sesiones distintas reclaman secuencialmente jobs distintos
     s1 = get_sessionmaker()()
     j1 = queue_service.claim_next(s1)
+    claim_event = db.query(models.JobEvent).filter(
+        models.JobEvent.job_id == j1.id,
+        models.JobEvent.to_status == "processing",
+    ).first()
+    assert claim_event is not None
     s2 = get_sessionmaker()()
     j2 = queue_service.claim_next(s2)
     assert j1.id != j2.id

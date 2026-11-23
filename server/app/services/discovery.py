@@ -20,6 +20,19 @@ CONNECT_TIMEOUT_S = 1.2
 MAX_CONCURRENCY = 64
 
 
+def validate_configured_range(cidr: str, configured_ranges: list[str]) -> None:
+    """Rechaza rangos que no estén contenidos en discovery_ranges guardados."""
+    try:
+        requested = ipaddress.ip_network(cidr, strict=False)
+        allowed = [ipaddress.ip_network(value, strict=False)
+                   for value in configured_ranges]
+    except (TypeError, ValueError) as exc:
+        raise ValueError("rango discovery no válido o mal configurado") from exc
+    if not any(requested.version == net.version and requested.subnet_of(net)
+               for net in allowed):
+        raise ValueError("el rango no está autorizado en discovery_ranges")
+
+
 def _network_ok(cidr: str) -> ipaddress.IPv4Network:
     try:
         net = ipaddress.ip_network(cidr, strict=False)

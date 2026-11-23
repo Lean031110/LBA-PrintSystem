@@ -6,6 +6,8 @@ from datetime import timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api import deps
@@ -67,12 +69,15 @@ def job_out(db: Session, j: models.Job, with_preview: bool = False,
 
 @router.get("/health")
 def health(db: Session = Depends(get_db)) -> dict:
-    q = {s: db.query(models.Job).filter(models.Job.status == s).count()
-         for s in ("pending", "processing", "sent", "failed", "cancelled")}
+    # Readiness: require the application schema to be queryable. Keep public
+    # output minimal; database details and operational data are not exposed.
+    try:
+        db.execute(text("SELECT 1 FROM jobs LIMIT 1"))
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=503, detail="database unavailable") from exc
     return {
         "status": "ok", "app": config.APP_NAME, "version": config.APP_VERSION,
-        "uptime_s": int(time.monotonic() - _STARTED_AT), "db": "ok",
-        "printers": db.query(models.Printer).count(), "queue": q,
+        "uptime_s": int(time.monotonic() - _STARTED_AT),
     }
 
 
@@ -84,7 +89,7 @@ def stats(db: Session = Depends(get_db)) -> dict:
         {"printer_id": p.id, "name": p.name, "status": p.status,
          "last_seen_at": p.last_seen_at.isoformat() + "Z" if p.last_seen_at else None,
          "last_error": p.last_error}
-        for p in db.query(models.Printer).all()
+        for p in db.query(models.Printer).filter(models.Printer.status != "deleted").all()
     ]
     return {"queue": q, "printers": per_printer,
             "uptime_s": int(time.monotonic() - _STARTED_AT)}
@@ -96,6 +101,7 @@ def stats(db: Session = Depends(get_db)) -> dict:
 def list_printers(db: Session = Depends(get_db)) -> dict:
     items = [printer_out(db, p)
              for p in db.query(models.Printer)
+             .filter(models.Printer.status != "deleted")
              .order_by(models.Printer.created_at).all()]
     return {"items": items, "count": len(items)}
 
@@ -127,7 +133,7 @@ def create_printer(body: S.PrinterCreate, request: Request,
 
 def _get_printer(db: Session, printer_id: str) -> models.Printer:
     p = db.get(models.Printer, printer_id)
-    if p is None:
+    if p is None or p.status == "deleted":
         raise HTTPException(404, "impresora no encontrada")
     return p
 
@@ -172,24 +178,25 @@ def delete_printer(printer_id: str, request: Request,
                                     models.Job.status.in_(["pending", "processing"])).count()):
         raise HTTPException(409, "la impresora tiene trabajos en cola; "
                                  "cáncelalos o reinténtalos antes de borrar")
-    job_ids = [row.id for row in db.query(models.Job.id)
-               .filter(models.Job.printer_id == p.id).all()]
-    if job_ids:
-        db.query(models.JobEvent).filter(
-            models.JobEvent.job_id.in_(job_ids)).delete(synchronize_session=False)
-        db.query(models.Job).filter(
-            models.Job.id.in_(job_ids)).delete(synchronize_session=False)
-    db.delete(p)
+    has_history = db.query(models.Job.id).filter(
+        models.Job.printer_id == p.id).first() is not None
+    if has_history:
+        models.archive_printer(db, p)
+    else:
+        db.delete(p)
     models.audit(db, deps.security.get_client_ip(request), "api",
-                 "printer.delete", {"id": printer_id})
+                 "printer.delete", {"id": printer_id, "archived": has_history})
     db.commit()
-    return {"deleted": printer_id}
+    return {"deleted": printer_id, "archived": has_history}
 
 
 @router.post("/printers/discover", dependencies=[Depends(deps.api_auth)])
 async def discover_printers(body: S.DiscoverRequest, request: Request,
                             db: Session = Depends(get_db)) -> dict:
     try:
+        discovery.validate_configured_range(
+            body.cidr, models.get_setting(db, "discovery_ranges",
+                                          config.DEFAULT_DISCOVERY_RANGES))
         found = await discovery.scan(body.cidr, body.ports)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
@@ -209,8 +216,12 @@ def printer_test(printer_id: str, body: S.TestPrintRequest,
     company = models.get_setting(db, "company_name", "LBA")
     doc = rendering.test_ticket(p, body.kind, company,
                                 models.get_setting(db, "logo_b64"))
-    job, created = queue_service.enqueue(db, p, doc, origin="test",
-                                         meta={"kind": body.kind})
+    try:
+        job, created = queue_service.enqueue(db, p, doc, origin="test",
+                                             meta={"kind": body.kind})
+    except OperationalError as exc:
+        db.rollback()
+        raise HTTPException(503, "base de datos ocupada; vuelva a intentar") from exc
     db.commit()
     out = job_out(db, job)
     out["duplicate"] = not created
@@ -230,6 +241,13 @@ def create_job(body: S.JobCreate, request: Request,
                                              origin=body.origin,
                                              idempotency_key=body.idempotency_key,
                                              meta=body.metadata)
+    except OperationalError as exc:
+        db.rollback()
+        raise HTTPException(
+            503, "base de datos ocupada; reintente con la misma clave idempotente"
+        ) from exc
+    except queue_service.IdempotencyKeyConflict as exc:
+        raise HTTPException(409, str(exc))
     except rendering.RenderError as exc:
         raise HTTPException(400, f"payload no imprimible: {exc}")
     db.commit()
@@ -297,7 +315,10 @@ def retry_job(job_id: str, request: Request,
 def reprint_job(job_id: str, request: Request,
                 db: Session = Depends(get_db)) -> dict:
     j = _get_job(db, job_id)
-    new = queue_service.reprint(db, j)
+    try:
+        new = queue_service.reprint(db, j)
+    except queue_service.PrinterUnavailable as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     models.audit(db, deps.security.get_client_ip(request), "api",
                  "job.reprint", {"id": job_id, "new_id": new.id})
     db.commit()

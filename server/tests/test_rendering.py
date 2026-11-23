@@ -87,3 +87,24 @@ def test_encoding_auto_no_explota():
         {"type": "text", "value": "ñ áéíóú ¿¡ €"},
     ]))
     assert len(blob) > 10                    # magic-encode conmuta codepages
+
+
+@pytest.mark.parametrize("payload_length", [8, 12, 260, 1024])
+def test_preview_consumes_gs_k_payload_using_pl_ph(payload_length):
+    # pL/pH expresan el tamaño de todos los bytes que siguen a la cabecera.
+    payload = b"LEAK" + bytes((index % 256 for index in range(payload_length - 4)))
+    command = b"\x1d(k" + bytes((payload_length & 0xFF, payload_length >> 8)) + payload
+    text = preview.render_preview(b"BEFORE\n" + command + b"\nAFTER")
+
+    assert "[QR]" in text
+    assert "BEFORE" in text and text.splitlines()[-1] == "AFTER"
+    assert "LEAK" not in text
+
+
+def test_preview_truncated_gs_k_header_and_payload_are_best_effort():
+    header_truncated = preview.render_preview(b"BEFORE\n\x1d(k\x05")
+    payload_truncated = preview.render_preview(b"BEFORE\n\x1d(k\x08\x00\x31\x50\x00X")
+
+    assert "BEFORE" in header_truncated and "[QR]" in header_truncated
+    assert "BEFORE" in payload_truncated and "[QR]" in payload_truncated
+    assert "X" not in payload_truncated
