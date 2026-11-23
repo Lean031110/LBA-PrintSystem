@@ -20,11 +20,11 @@
 | POST | `/jobs` | Añadir trabajo (payload estructurado) | token |
 | GET | `/jobs` | Lista con filtros `status`, `printer_id`, `limit` | token |
 | GET | `/jobs/{id}` | Detalle + eventos | token |
-| POST | `/jobs/{id}/retry` | Reintentar (`failed`→`pending`) | token |
+| POST | `/jobs/{id}/retry` | Reintentar trabajo remoto existente (`failed`→`pending`) | token |
 | POST | `/jobs/{id}/reprint` | Reimprimir (nuevo job, mismo payload) | token |
 | POST | `/jobs/{id}/cancel` | Cancelar si está pendiente | token |
 
-Errores estándar: `400` payload inválido · `401` sin token · `403` IP no autorizada / token inválido · `404` no existe · `409` `idempotency_key` duplicada (devuelve el job existente) · `413` payload demasiado grande · `429` rate limit.
+Errores estándar: `400` payload inválido · `401` sin token · `403` IP no autorizada / token inválido · `404` no existe · `409` `idempotency_key` duplicada (el trabajo existente está en `detail.job`) · `413` payload demasiado grande · `429` rate limit.
 
 ## 2. Objeto `Printer`
 
@@ -58,7 +58,7 @@ Errores estándar: `400` payload inválido · `401` sin token · `403` IP no aut
 ```json
 {
   "printer_id": "b7e2…uuid…",
-  "idempotency_key": "odoo:pos.order:uuid…:delta:7f3c:printer:12",
+  "idempotency_key": "lba:pos-order-uuid:delta:operation-uuid:d12-p7-c0",
   "origin": "odoo",
   "metadata": { "order_ref": "Order 00042-001-0023", "kind": "kitchen" },
   "document": {
@@ -79,6 +79,11 @@ Errores estándar: `400` payload inválido · `401` sin token · `403` IP no aut
   }
 }
 ```
+
+La clave idempotente es opcional para consumidores generales, pero Odoo la
+exige para cada operación. El servidor limita su longitud a 200 caracteres y
+al alfabeto `[A-Za-z0-9_:\\-.]`. Odoo conserva el mismo ID durante retries de
+una operación; cada reimpresión intencional genera uno distinto.
 
 **Bloques válidos** (unión discriminada por `type`; todo validado con Pydantic):
 
@@ -107,7 +112,7 @@ Respuesta `202` (encolado):
 }
 ```
 
-Con `idempotency_key` repetida: `409` + cuerpo del job existente con `"duplicate": true` (no se encola nada nuevo).
+Con `idempotency_key` repetida: `409` con el job existente en `detail.job` y `"duplicate": true` (no se encola nada nuevo).
 
 ## 4. Estados y semántica
 
@@ -130,4 +135,4 @@ Con `idempotency_key` repetida: `409` + cuerpo del job existente con `"duplicate
 
 ## 6. Consumidor de referencia (Odoo)
 
-El addon `lba_print_connector` usa exclusivamente: `GET /health`, `GET /printers`, `POST /jobs`, `GET /jobs/{id}`. Ver `ODOO_INTEGRATION.md`.
+El addon `lba_print_connector` usa `GET /health`, `GET /printers`, `POST /jobs`, `GET /jobs/{id}` y `POST /jobs/{id}/retry`. El POST de Odoo al servidor LBA se ejecuta desde el cron, nunca en la llamada del TPV. Ver `ODOO_INTEGRATION.md`.

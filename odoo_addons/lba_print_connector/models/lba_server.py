@@ -168,6 +168,16 @@ class LbaPrintServer(models.Model):
             "document": document,
         }
         try:
+            if job.external_job_id and job.server_status == "failed":
+                resp = server._request(
+                    "POST", f"/jobs/{job.external_job_id}/retry")
+                if resp.status_code == 200:
+                    return True, resp.json()
+                if resp.status_code == 409:
+                    current = server.lba_get_job(job.external_job_id) or {}
+                    if current.get("status") in ("pending", "processing", "sent"):
+                        return True, current
+                return False, f"HTTP {resp.status_code}: {resp.text[:200]}"
             resp = server._request("POST", "/jobs", json=body)
             if resp.status_code in (200, 202):
                 data = resp.json()
@@ -175,6 +185,8 @@ class LbaPrintServer(models.Model):
             if resp.status_code == 409:
                 # idempotencia: el servidor ya lo tiene (por un reintento previo)
                 data = resp.json().get("detail", {}).get("job", {})
+                if data.get("status") == "failed":
+                    return False, "El trabajo remoto falló; reintentar su ID existente"
                 return True, data
             return False, f"HTTP {resp.status_code}: {resp.text[:200]}"
         except Exception as exc:
