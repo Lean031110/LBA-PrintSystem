@@ -10,7 +10,28 @@ umask 077
 cd "$(dirname "$0")/../.."
 cd server
 
-BASE="${BASE:-http://127.0.0.1:8000}"
+find_free_port() {
+  python3 - "$1" <<'PY'
+import socket
+import sys
+start = int(sys.argv[1])
+for port in range(start, start + 100):
+    with socket.socket() as sock:
+        try:
+            sock.bind(("127.0.0.1", port))
+        except OSError:
+            continue
+        print(port)
+        break
+else:
+    raise SystemExit("no hay un puerto local libre")
+PY
+}
+
+DEMO_PORT="${LBA_DEMO_PORT:-$(find_free_port 18000)}"
+SIM_PORT="${LBA_DEMO_SIM_PORT:-$(find_free_port 19000)}"
+export LBA_PORT="$DEMO_PORT"
+BASE="${BASE:-http://127.0.0.1:${DEMO_PORT}}"
 BASE="${BASE%/}"
 python3 - "$BASE" "${LBA_DEMO_ALLOW_REMOTE:-0}" <<'PY'
 import ipaddress
@@ -71,8 +92,8 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 printf '· directorio temporal privado: %s\n' "$RUN_DIR"
-python -m app.drivers.simulator --port 9910 --print >"$SIM_LOG" 2>&1 & PIDS+=($!)
-python -m uvicorn app.main:app --port 8000 --log-level warning >"$API_LOG" 2>&1 & PIDS+=($!)
+python -m app.drivers.simulator --port "$SIM_PORT" --print >"$SIM_LOG" 2>&1 & PIDS+=($!)
+python -m uvicorn app.main:app --host 127.0.0.1 --port "$DEMO_PORT" --log-level warning >"$API_LOG" 2>&1 & PIDS+=($!)
 python -m app.worker >"$WORKER_LOG" 2>&1 & PIDS+=($!)
 
 echo "· esperando a la API…"
@@ -89,17 +110,17 @@ fi
 echo; echo "== 1) Salud del servidor =="
 curl -s "$BASE/api/v1/health"; echo
 
-echo; echo "== 2) Registrar impresora (simulador en 127.0.0.1:9910) =="
+echo; echo "== 2) Registrar impresora (simulador en 127.0.0.1:$SIM_PORT) =="
 PRINTERS=$(curl -s -X POST "$BASE/api/v1/printers" \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"name":"Cocina (demo)","ip":"127.0.0.1","port":9910,"profile":"simulator","paper_width_mm":80,"encoding":"CP850","manufacturer":"LBA","model":"Simulator"}')
+  -d "{\"name\":\"Cocina (demo)\",\"ip\":\"127.0.0.1\",\"port\":$SIM_PORT,\"profile\":\"simulator\",\"paper_width_mm\":80,\"encoding\":\"CP850\",\"manufacturer\":\"LBA\",\"model\":\"Simulator\"}")
 echo "$PRINTERS" | python3 -c 'import sys,json; d=json.load(sys.stdin); print("id:", d["id"], "|", d["name"], "|", d["ip"]+":"+str(d["port"]), "|", d["protocol"])'
 PR_ID=$(echo "$PRINTERS" | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])')
 
 echo; echo "== 3) Descubrimiento en loopback únicamente (127.0.0.0/29) =="
 curl -s -X POST "$BASE/api/v1/printers/discover" \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"cidr":"127.0.0.0/29","ports":[9910]}'; echo
+  -d "{\"cidr\":\"127.0.0.0/29\",\"ports\":[$SIM_PORT]}"; echo
 
 echo; echo "== 4) Ticket de prueba 'caracteres' (ñ áéíóú ¿¡) =="
 JOB=$(curl -s -X POST "$BASE/api/v1/printers/$PR_ID/test" \

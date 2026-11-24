@@ -34,8 +34,9 @@ PRINTER_BLOCKED_NETS = [
     "169.254.0.0/16", "100.64.0.0/10", "0.0.0.0/8", "192.0.2.0/24",
     "198.51.100.0/24", "203.0.113.0/24",
 ]
-# Rango de discovery por defecto (editable en el panel).
-DEFAULT_DISCOVERY_RANGES = ["192.168.1.0/24"]
+# Rangos de discovery por defecto (editables en el panel). Loopback permite
+# probar el simulador local sin abrir el escaneo a ninguna red externa.
+DEFAULT_DISCOVERY_RANGES = ["127.0.0.0/8", "192.168.1.0/24"]
 
 # --- Codificaciones soportadas (ES) -----------------------------------------
 # Código ESC/POS "ESC t n" por codepage (tabla Epson estándar seguida por clones).

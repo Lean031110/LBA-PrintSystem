@@ -121,6 +121,7 @@ if [[ ! -f "$ENV_FILE" ]]; then
 # LBA Print Server — configuración (systemd EnvironmentFile)
 LBA_HOST=0.0.0.0
 LBA_PORT=8000
+LBA_SIM_PORT=9910
 LBA_DATA_DIR=$VAR_DIR
 LBA_DB_PATH=$VAR_DIR/lba.db
 # Los secretos se generan de forma aleatoria al inicializar la BD.

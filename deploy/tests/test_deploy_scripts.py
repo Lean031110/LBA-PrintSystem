@@ -108,6 +108,21 @@ echo "pct $*" >> "$MOCK_PVE_LOG"
 
 
 class DemoSafetyTests(unittest.TestCase):
+    def test_systemd_units_use_environment_variables_supported_by_systemd(self) -> None:
+        api = (ROOT / "deploy/systemd/lba-print-api.service").read_text(encoding="utf-8")
+        simulator = (ROOT / "deploy/systemd/lba-print-simulator.service").read_text(encoding="utf-8")
+        self.assertIn("--host ${LBA_HOST} --port ${LBA_PORT}", api)
+        self.assertIn("--port ${LBA_SIM_PORT}", simulator)
+        self.assertNotIn(":-", api + simulator)
+
+    def test_walkthrough_uses_authorized_loopback_and_dynamic_ports(self) -> None:
+        source = (SCRIPTS / "demo_walkthrough.sh").read_text(encoding="utf-8")
+        self.assertIn('find_free_port()', source)
+        self.assertIn('export LBA_PORT="$DEMO_PORT"', source)
+        self.assertIn('127.0.0.0/29', source)
+        self.assertIn('[$SIM_PORT]', source)
+        self.assertNotIn('port":9910', source)
+
     def test_walkthrough_uses_private_ephemeral_paths_and_cleans_by_default(self) -> None:
         source = (SCRIPTS / "demo_walkthrough.sh").read_text(encoding="utf-8")
         self.assertIn("umask 077", source)
