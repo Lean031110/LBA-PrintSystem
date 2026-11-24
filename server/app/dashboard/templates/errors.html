@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Errores{% endblock %}
+{% block content %}
+<h1>Errores</h1>
+
+<h2>Impresoras caídas ({{ printers|length }})</h2>
+{% if printers %}
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Nombre</th><th>IP</th><th>Último error</th><th>Última actividad</th><th>Acción</th></tr></thead>
+  <tbody>
+  {% for p in printers %}
+  <tr>
+    <td><a href="/devices/{{ p.id }}">{{ p.name }}</a></td>
+    <td>{{ p.ip }}:{{ p.port }}</td>
+    <td class="err-text">{{ p.last_error[:120] }}</td>
+    <td>{{ p.last_seen_at.strftime('%m-%d %H:%M') if p.last_seen_at else '—' }}</td>
+    <td><a class="btn btn-xs" href="/test_print">Probar</a></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="card empty">Ninguna impresora marcada como caída.</div>
+{% endif %}
+
+<h2>Trabajos fallidos ({{ jobs|length }})</h2>
+{% if jobs %}
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Job</th><th>Impresora</th><th>Intentos</th><th>Último error</th><th>Actualizado</th><th>Acciones</th></tr></thead>
+  <tbody>
+  {% for j in jobs %}
+  <tr>
+    <td><a href="/jobs/{{ j.id }}">{{ j.id[:8] }}…</a></td>
+    <td>{{ j.printer_id[:8] }}…</td>
+    <td>{{ j.attempts }}/{{ j.max_attempts }}</td>
+    <td class="err-text">{{ (j.last_error or '')[:100] }}</td>
+    <td>{{ j.updated_at.strftime('%m-%d %H:%M:%S') }}</td>
+    <td class="actions">
+      <form method="post" action="/queue/{{ j.id }}/retry"><button class="btn btn-xs">Reintentar</button></form>
+      <form method="post" action="/queue/{{ j.id }}/reprint" class="confirmable" data-msg="¿Reimprimir?"><button class="btn btn-xs">Reimprimir</button></form>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="card empty">Sin trabajos fallidos.</div>
+{% endif %}
+{% endblock %}

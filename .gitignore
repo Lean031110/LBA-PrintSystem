@@ -1,6 +1,5 @@
 # Datos y secretos — nunca se versionan
 server/data/
-**/data/
 *.db
 *.db-journal
 *.db-wal
@@ -19,6 +18,8 @@ venv/
 .pytest_cache/
 .coverage
 htmlcov/
+dist/
+lba-odoo-*.log
 
 # IDE / sistema
 .idea/

@@ -1,0 +1,26 @@
+[Unit]
+Description=LBA Print Server — worker de la cola de impresión
+Documentation=https://github.com/LBA-PrintSystem
+After=network-online.target lba-print-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=lba
+Group=lba
+WorkingDirectory=/opt/lba/server
+EnvironmentFile=-/etc/lba-print/lba-print.env
+ExecStart=/opt/lba/server/.venv/bin/python -m app.worker
+Restart=always
+RestartSec=5
+# si el worker muere a mitad de un trabajo, al arrancar recupera los
+# 'processing' huérfanos como 'pending' (recover_orphan_processing).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/lba
+ProtectHome=true
+MemoryMax=256M
+
+[Install]
+WantedBy=multi-user.target

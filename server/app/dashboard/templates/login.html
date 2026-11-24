@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Acceso · LBA Print Server</title>
+  <link rel="stylesheet" href="/static/css/lba.css">
+</head>
+<body class="login-page">
+  <div class="login-card">
+    <div class="brand">
+      <span class="brand-mark">LBA</span>
+      <span class="brand-name">Print Server</span>
+    </div>
+    <h1>Acceso al panel</h1>
+    <p class="muted">Usuario <strong>admin</strong> · red local</p>
+    {% if flash %}
+    <div class="flash flash-{{ flash.kind or 'ok' }}">{{ flash.msg }}</div>
+    {% endif %}
+    <form method="post" action="/login" class="login-form">
+      <label for="password">Contraseña</label>
+      <input id="password" name="password" type="password" autofocus
+             autocomplete="current-password" required>
+      <button class="btn btn-primary" type="submit">Entrar</button>
+    </form>
+    <p class="muted small">Sin acceso remoto · sin nube · MIT</p>
+  </div>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Cola de impresión{% endblock %}
+{% block content %}
+<h1>Cola de impresión</h1>
+<p class="muted">Actualización automática cada 3 s (HTMX local, sin Internet).</p>
+
+<div class="tabs">
+  {% for f in ['all', 'pending', 'processing', 'sent', 'failed', 'cancelled'] %}
+  <a class="tab {{ 'active' if status_filter == f }}" href="/queue?status={{ f }}">{{ f }}</a>
+  {% endfor %}
+</div>
+
+<div id="queue-table" hx-get="/queue/partials/rows?status={{ status_filter }}"
+     hx-trigger="every 3s" hx-swap="innerHTML">
+  {% include "partials/queue_rows.html" %}
+</div>
+{% endblock %}

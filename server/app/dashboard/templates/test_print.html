@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Prueba de impresión{% endblock %}
+{% block content %}
+<h1>Prueba de impresión</h1>
+<p class="muted">Encola un ticket de prueba en la impresora elegida. El worker
+lo enviará por TCP 9100 (o al simulador) y podrás ver la vista previa en la
+Cola/Historial. Recuerda: el estado será <em>sent</em> (enviado), no
+"impreso físicamente".</p>
+
+<form method="post" action="/test_print" class="card form-grid">
+  <div class="f"><label>Impresora *</label>
+    <select name="printer_id" required>
+      {% for p in printers %}
+      <option value="{{ p.id }}">{{ p.name }} · {{ p.ip }}:{{ p.port }} · {{ p.status }}{% if not p.active %} (inactiva){% endif %}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="f"><label>Tipo de ticket</label>
+    <select name="kind">
+      <option value="basico">Básico (texto + corte)</option>
+      <option value="caracteres">Caracteres españoles (ñ áéíóú ¿¡)</option>
+      <option value="graficos">Gráficos (QR + código de barras + logo)</option>
+      <option value="corte">Corte (feed y corte total/parcial)</option>
+    </select>
+  </div>
+  <div class="f f-wide"><button class="btn btn-primary" type="submit">Enviar ticket de prueba</button></div>
+</form>
+
+{% if not printers %}
+<div class="card empty">Primero registra una impresora en
+<a href="/devices">Dispositivos</a>. Para probar sin hardware:
+<code>python -m app.drivers.simulator --port 9910</code> y registra
+127.0.0.1:9910 con perfil <em>simulator</em>.</div>
+{% endif %}
+{% endblock %}

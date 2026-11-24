@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_lba_printer_tree" model="ir.ui.view">
+        <field name="name">lba.print.printer.tree</field>
+        <field name="model">lba.print.printer</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="server_id"/>
+                <field name="name"/>
+                <field name="manufacturer"/>
+                <field name="model"/>
+                <field name="ip"/>
+                <field name="port"/>
+                <field name="connection_type" string="Conexión"/>
+                <field name="paper_width_mm" string="Papel (mm)"/>
+                <field name="protocol"/>
+                <field name="status" widget="badge"
+                       decoration-success="status == 'online'"
+                       decoration-danger="status == 'offline'"/>
+                <field name="department_ids" widget="many2many_tags"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_lba_printer_form" model="ir.ui.view">
+        <field name="name">lba.print.printer.form</field>
+        <field name="model">lba.print.printer</field>
+        <field name="arch" type="xml">
+            <form string="Impresora LBA">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group string="Réplica del servidor (solo lectura)">
+                            <field name="server_id" readonly="1"/>
+                            <field name="external_id" readonly="1"/>
+                            <field name="ip" readonly="1"/>
+                            <field name="port" readonly="1"/>
+                            <field name="connection_type" readonly="1"/>
+                            <field name="protocol" readonly="1"/>
+                        </group>
+                        <group string="Detalles">
+                            <field name="manufacturer" readonly="1"/>
+                            <field name="model" readonly="1"/>
+                            <field name="paper_width_mm" readonly="1"/>
+                            <field name="encoding" readonly="1"/>
+                            <field name="status" readonly="1"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <group string="Departamentos">
+                        <field name="department_ids" widget="many2many_tags"/>
+                    </group>
+                    <group string="Notas de compatibilidad">
+                        <field name="notes" placeholder="Hallazgos verificados con hardware: QR, barcode, corte, codepage…"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_lba_printer" model="ir.actions.act_window">
+        <field name="name">Impresoras LBA</field>
+        <field name="res_model">lba.print.printer</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Sincroniza impresoras desde el servidor</p>
+            <p>Usa Servidor → Sincronizar impresoras (GET /printers) para
+            crear esta réplica.</p>
+        </field>
+    </record>
+</odoo>

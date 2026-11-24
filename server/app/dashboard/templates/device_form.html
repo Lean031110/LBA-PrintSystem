@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Configuración de dispositivo{% endblock %}
+{% block content %}
+<h1>{{ p.name }}</h1>
+<p class="muted">Configuración de la impresora · <span class="badge badge-{{ 'ok' if p.status == 'online' else ('err' if p.status == 'offline' else '') }}">{{ p.status }}</span>
+{% if p.last_error %} <span class="err-text">{{ p.last_error[:120] }}</span>{% endif %}</p>
+
+<form method="post" action="/devices/{{ p.id }}" class="card form-grid">
+  <div class="f"><label>Nombre *</label><input name="name" value="{{ p.name }}" required></div>
+  <div class="f"><label>IP *</label><input name="ip" value="{{ p.ip }}" required></div>
+  <div class="f"><label>Puerto</label><input name="port" type="number" value="{{ p.port }}" min="1" max="65535"></div>
+  <div class="f"><label>Fabricante</label><input name="manufacturer" value="{{ p.manufacturer }}"></div>
+  <div class="f"><label>Modelo</label><input name="model" value="{{ p.model }}"></div>
+  <div class="f"><label>Perfil</label>
+    <select name="profile">
+      <option value="generic" {{ 'selected' if p.profile == 'generic' }}>generic — ESC/POS red</option>
+      <option value="simulator" {{ 'selected' if p.profile == 'simulator' }}>simulator — emulador LBA</option>
+    </select>
+  </div>
+  <div class="f"><label>Ancho de papel</label>
+    <select name="paper_width_mm">
+      <option value="80" {{ 'selected' if p.paper_width_mm == 80 }}>80 mm (48 columnas)</option>
+      <option value="58" {{ 'selected' if p.paper_width_mm == 58 }}>58 mm (32 columnas)</option>
+    </select>
+  </div>
+  <div class="f"><label>Codificación</label>
+    <select name="encoding">
+      {% for enc in ['CP850', 'AUTO', 'CP437', 'CP852', 'Windows-1252'] %}
+      <option value="{{ enc }}" {{ 'selected' if p.encoding == enc }}>{{ enc }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="f"><label>Activa</label>
+    <select name="active">
+      <option value="true" {{ 'selected' if p.active }}>Sí</option>
+      <option value="false" {{ 'selected' if not p.active }}>No</option>
+    </select>
+  </div>
+  <div class="f"><label>Corte automático</label>
+    <select name="cut">
+      <option value="true" {{ 'selected' if settings.get('cut', True) }}>Sí (GS V)</option>
+      <option value="false" {{ 'selected' if not settings.get('cut', True) }}>No</option>
+    </select>
+  </div>
+  <div class="f"><label>Feeds antes de cortar</label><input name="feed_before_cut" type="number" min="0" max="20" value="{{ settings.get('feed_before_cut', 3) }}"></div>
+  <div class="f"><label>Densidad (opcional −8…8)</label><input name="density" type="number" min="-8" max="8" value="{{ settings.get('density') if settings.get('density') is not none else -99 }}"></div>
+  <div class="f"><label>Tamaño QR</label><input name="qr_size" type="number" min="1" max="16" value="{{ settings.get('qr_size', 6) }}"></div>
+  <div class="f f-wide"><label>Notas</label><input name="notes" value="{{ p.notes }}"></div>
+  <div class="f f-wide"><button class="btn btn-primary" type="submit">Guardar cambios</button>
+    <a class="btn" href="/test_print">Probar esta impresora</a></div>
+</form>
+
+<h2>Últimos trabajos de esta impresora</h2>
+{% if jobs %}
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Job</th><th>Origen</th><th>Estado</th><th>Intentos</th><th>Creado</th><th>Error</th></tr></thead>
+  <tbody>
+  {% for j in jobs %}
+  <tr>
+    <td><a href="/jobs/{{ j.id }}">{{ j.id[:8] }}…</a></td>
+    <td>{{ j.origin }}</td>
+    <td><span class="badge badge-{{ 'ok' if j.status == 'sent' else ('err' if j.status == 'failed' else ('warn' if j.status in ('pending', 'processing') else '')) }}">{{ j.status }}</span></td>
+    <td>{{ j.attempts }}/{{ j.max_attempts }}</td>
+    <td>{{ j.created_at.strftime('%m-%d %H:%M:%S') }}</td>
+    <td class="err-text">{{ (j.last_error or '')[:60] }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="card empty">Aún no hay trabajos para esta impresora.</div>
+{% endif %}
+{% endblock %}

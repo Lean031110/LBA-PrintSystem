@@ -1,6 +1,6 @@
 # LBA PRINT SYSTEM
 
-Sistema de impresión térmica para **Odoo 19 Community** en red local, sin nube, sin Docker y sin IoT Box. Equivalente a una "IoT Box" especializada en impresoras, con dos componentes:
+Sistema de impresión térmica para **Odoo 19 Community** en red local, sin nube y sin Docker. Se limita a impresión ESC/POS de red y puede coexistir con las impresoras y periféricos nativos de Odoo; no pretende reemplazar todas las capacidades de IoT Box. Consta de dos componentes:
 
 | Componente | Tecnología | Qué hace |
 |---|---|---|
@@ -16,9 +16,13 @@ Sistema de impresión térmica para **Odoo 19 Community** en red local, sin nube
 | [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) | Matriz de compatibilidad (plataformas, impresoras, encodings) y guía de verificación con hardware |
 | [docs/API_CONTRACT.md](docs/API_CONTRACT.md) | Contrato REST `/api/v1` con ejemplos JSON |
 | [docs/ODOO_INTEGRATION.md](docs/ODOO_INTEGRATION.md) | Diseño e integración del addon Odoo |
+| [docs/ODOO19_REFERENCE.md](docs/ODOO19_REFERENCE.md) | Referencias del core Odoo 19 consultadas para carga POS y puntos de extensión |
+| [docs/ODOO_VALIDACION.md](docs/ODOO_VALIDACION.md) | Matriz de evidencia y checklist aislado de QA del addon |
+| [docs/PRINT_TEMPLATE_DESIGNER.md](docs/PRINT_TEMPLATE_DESIGNER.md) | Contrato del diseñador visual y serialización de tickets |
 | [docs/PROXMOX_INSTALLATION.md](docs/PROXMOX_INSTALLATION.md) | Instalación en LXC no privilegiado de Proxmox |
 | [docs/SECURITY.md](docs/SECURITY.md) | Modelo de amenazas y mitigaciones |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Fases con objetivos y criterios de aceptación |
+| [docs/FINAL_AUDIT.md](docs/FINAL_AUDIT.md) | Hallazgos, correcciones, evidencia y gates pendientes de esta auditoría |
 | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Guía de usuario del panel y del conector |
 
 ## Arranque rápido (desarrollo, sin impresora)
@@ -49,8 +53,35 @@ Ver [docs/PROXMOX_INSTALLATION.md](docs/PROXMOX_INSTALLATION.md) (LXC Debian 12 
 ## Pruebas
 
 ```bash
-cd server && . .venv/bin/activate && pytest -q
+cd server && . .venv/bin/activate && PYTHONPATH=. python -m pytest -q
+cd ..
+python3 -m unittest discover -s deploy/tests -v
+node --test odoo_addons/lba_print_connector/tests/*.mjs
 ```
+
+### Estado de QA del addon Odoo
+
+El código QA de esta rama fue probado en el commit
+`49f7249be25e518844de6d7fb5ea427ef08ef7dc`. El
+[workflow del servidor](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45285525809)
+y el [workflow Odoo 19](https://github.com/Lean031110/LBA-PrintSystem/actions/runs/45285525821)
+terminaron `success` sobre ese SHA. Odoo pasó instalación limpia y actualización
+en bases separadas; el resumen final de cada ejecución registra 0 fallos y 0
+errores en 28 tests.
+
+Ambos workflows publicaron los paquetes QA para ese SHA. Los artefactos
+descargados de los dos runs son idénticos, sus checksums SHA-256 y estructuras
+ZIP/TAR se verificaron y `BUILD-INFO.txt` identifica el commit probado. Son
+artefactos de QA, no una release estable ni evidencia de instalación en Debian
+12/LXC.
+
+En sandbox también pasaron 60 tests del servidor (46 warnings), 22 pruebas de
+despliegue aisladas, 2 archivos Node, validación del manifest, AST Python,
+parseo XML y `git diff --check`. No se han verificado navegador OWL/TPV,
+integración E2E Odoo↔LBA, LXC/systemd real, estrés multiproceso, TLS/cookie
+Secure, operación offline bloqueando egress ni hardware físico. La matriz de
+evidencia está en [docs/ODOO_VALIDACION.md](docs/ODOO_VALIDACION.md); no instalar
+esta rama ni ejecutar migraciones en la base real de Lo D’ Leo.
 
 ## Estructura
 

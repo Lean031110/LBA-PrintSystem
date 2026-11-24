@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Historial{% endblock %}
+{% block content %}
+<h1>Historial de trabajos</h1>
+<p class="muted">Últimos 100 trabajos terminados (enviados, fallidos o
+cancelados). El estado <em>sent</em> significa enviado correctamente por TCP,
+no impresión física confirmada.</p>
+
+{% if jobs %}
+<div class="table-wrap">
+<table>
+  <thead><tr>
+    <th>Job</th><th>Impresora</th><th>Origen</th><th>Estado</th>
+    <th>Bytes</th><th>Creado</th><th>Enviado</th><th>Detalle</th>
+  </tr></thead>
+  <tbody>
+  {% for j in jobs %}
+  <tr>
+    <td><a href="/jobs/{{ j.id }}">{{ j.id[:8] }}…</a></td>
+    <td>{{ j.printer_id[:8] }}…</td>
+    <td>{{ j.origin }}</td>
+    <td><span class="badge badge-{{ 'ok' if j.status == 'sent' else ('err' if j.status == 'failed' else '') }}">{{ j.status }}</span></td>
+    <td>{{ j.bytes_len }}</td>
+    <td>{{ j.created_at.strftime('%m-%d %H:%M:%S') }}</td>
+    <td>{{ j.sent_at.strftime('%m-%d %H:%M:%S') if j.sent_at else '—' }}</td>
+    <td><a class="btn btn-xs" href="/jobs/{{ j.id }}">Ver ticket</a></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="card empty">Historial vacío.</div>
+{% endif %}
+{% endblock %}

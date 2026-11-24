@@ -1,0 +1,18 @@
+{% if last_jobs %}
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Job</th><th>Estado</th><th>Creado</th></tr></thead>
+  <tbody>
+  {% for j in last_jobs %}
+  <tr>
+    <td><a href="/jobs/{{ j.id }}">{{ j.id[:8] }}…</a></td>
+    <td><span class="badge badge-{{ 'ok' if j.status == 'sent' else ('err' if j.status == 'failed' else ('warn' if j.status in ('pending', 'processing') else '')) }}">{{ j.status }}</span></td>
+    <td>{{ j.created_at.strftime('%m-%d %H:%M:%S') }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="card empty">Sin trabajos todavía.</div>
+{% endif %}
