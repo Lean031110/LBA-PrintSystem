@@ -2,7 +2,7 @@ name: CI Odoo 19 — LBA Print Connector
 
 on:
   push:
-    branches: [fix/odoo19-addon-qa-layouts]
+    branches: [main, fix/odoo19-addon-qa-layouts]
   pull_request:
 
 permissions:
