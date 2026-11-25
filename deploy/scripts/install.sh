@@ -37,6 +37,10 @@ umask 077
 install -d -m 0750 "$(dirname "$LOG_FILE")"
 touch "$LOG_FILE"
 chmod 0600 "$LOG_FILE"
+# El log y las credenciales se protegen con chmod explícito. El resto del árbol
+# (/opt/lba, venv incluido) debe ser legible/ejecutable por el usuario lba que
+# corre los servicios, así que no se propaga el umask restrictivo.
+umask 022
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 echo "== LBA Print System: instalación =="
