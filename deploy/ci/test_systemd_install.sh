@@ -60,9 +60,10 @@ grep -q '^LBA_PORT=8000$' /etc/lba-print/lba-print.env || fail "LBA_PORT ausente
 command -v runuser >/dev/null || fail "runuser (util-linux) no está disponible"
 runuser -u lba -- test -x /opt/lba/server/.venv/bin/python || \
     fail "el usuario lba no puede ejecutar el python del venv (permisos)"
-runuser -u lba -- env PYTHONPATH=/opt/lba/server /opt/lba/server/.venv/bin/python \
-    -c 'import app.main' >/dev/null 2>&1 || \
-    fail "el usuario lba no puede importar app.main con el venv instalado"
+runuser -u lba -- bash -c '
+    set -a; . /etc/lba-print/lba-print.env; set +a
+    cd /opt/lba/server && exec .venv/bin/python -c "import app.main"
+' || fail "el usuario lba no puede importar app.main con el venv instalado"
 
 log "Healthcheck público mínimo"
 HEALTH="$(curl -fsS "$API/api/v1/health")"
