@@ -192,9 +192,22 @@ def main() -> int:
             print("BROWSER E2E OK")
             return 0
         except Exception:
-            screenshot("99-error")
+            try:
+                screenshot("99-error")
+            except Exception as shot_error:  # la página pudo cerrarse
+                print("no se pudo capturar:", shot_error, file=sys.stderr)
             print("página actual:", page.url, file=sys.stderr)
             print("errores JS:", page_errors, file=sys.stderr)
+            for selector, label in (
+                (".o_notification", "notificaciones"),
+                (".modal .modal-body", "modal"),
+                ("body", "texto visible"),
+            ):
+                try:
+                    texts = page.locator(selector).all_inner_texts()[:3]
+                except Exception:
+                    continue
+                print(f"{label}:", [text[:400] for text in texts], file=sys.stderr)
             raise
         finally:
             browser.close()

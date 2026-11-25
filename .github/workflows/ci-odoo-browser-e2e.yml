@@ -164,12 +164,22 @@ jobs:
           exit 1
 
       - name: E2E de navegador con Chromium
+        env:
+          LOG: ${{ runner.temp }}/browser-e2e.log
         run: |
+          set +e
           python deploy/ci/odoo_browser_e2e.py \
             --odoo-url http://127.0.0.1:8069 \
             --lba-url http://127.0.0.1:18000 \
             --documents-dir "$PRINTER_DOCS" \
-            --screenshots-dir "$SCREENSHOTS"
+            --screenshots-dir "$SCREENSHOTS" 2>&1 | tee "$LOG"
+          rc=${PIPESTATUS[0]}
+          set -e
+          if (( rc != 0 )); then
+            message="$(tail -c 3500 "$LOG" | tr '\n' '|' | tr -d '\r')"
+            echo "::error title=E2E navegador falló::$message"
+            exit "$rc"
+          fi
 
       - name: Publicar documentos impresos, capturas y logs
         if: always()
@@ -182,6 +192,7 @@ jobs:
             ${{ runner.temp }}/screenshots/*
             ${{ runner.temp }}/odoo-init.log
             ${{ runner.temp }}/odoo-server.log
+            ${{ runner.temp }}/browser-e2e.log
             ${{ runner.temp }}/lba-api.log
             ${{ runner.temp }}/lba-worker.log
             ${{ runner.temp }}/lba-simulator.log
