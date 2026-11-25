@@ -629,20 +629,45 @@ Esta sección documenta la ampliación de CI y la evidencia ejecutada **hoy** en
 | `server/app/drivers/simulator.py --save-dir` | **Impresora virtual con papel en disco**: por cada documento recibido escribe `document-NNNN-<sha>.escpos.bin` (bytes exactos), `.txt` (reconstrucción legible) y una línea en `documents.jsonl` con hash, tamaño y hora. Es la validación de que la impresión llegó al destino, sin hardware. |
 | `server/tests/test_virtual_printer.py` | Regresiones del papel virtual y del parser de preview. |
 
-### Evidencia ejecutada hoy (sandbox, no CI remoto)
+### Evidencia local (sandbox, sin Docker)
 
 - Suite del servidor: `cd server && PYTHONPATH=. .venv/bin/python -m pytest -q` → **62 passed, 46 warnings** (60 previos + 2 nuevos). Los warnings son los mismos Starlette/httpx y SQLAlchemy/SQLite ya documentados; no son fallos.
 - Instalación limpia real desde el paquete: paquete construido desde un snapshot limpio del árbol (`16184c3...`) y `bash deploy/scripts/verify_clean_install.sh …` → **CLEAN INSTALL OK**: sin requisitos rotos, BD/tablas creadas, credenciales y `secret_key` en modo 0600, `/api/v1/health` con solo las cuatro claves públicas y worker `--once` correcto.
 - Estrés local: `deploy/scripts/stress_test.py --jobs 300 --duplicates 30 --burst 10 --concurrency 24 --workers 3 --printers 3` → 600 peticiones (330 `202` + 270 `409`), **330 documentos** con hash único, `integrity_check=ok`, ~284 req/s de admisión y ~90 trabajos/s de drenaje; p50 68.8 ms / p95 136.1 ms. También pasó el escenario 120/2/2 y 140 trabajos únicos.
 - Sintaxis: `bash -n` en los scripts nuevos y modificados, `py_compile` de los scripts de CI y **parseo YAML de los 5 workflows** → OK.
-- Defectos corregidos durante la ampliación: (a) `preview.render_preview` entraba en **bucle infinito** ante un comando `ESC` desconocido (encontrado con bytes de control en la impresora virtual); ahora consume el comando y hay test de regresión; (b) `install.sh` verificaba salud una sola vez tras 2 s; ahora espera readiness hasta 60 s y falla con diagnóstico. También se añadió `workflow_dispatch` a los workflows para poder ejecutarlos manualmente sobre una rama de QA.
+
+### Resultados reales en GitHub Actions
+
+Los workflows se ejecutaron sobre el PR en borrador [#1](https://github.com/Lean031110/LBA-PrintSystem/pull/1) (el `workflow_dispatch` no está disponible hasta que el workflow exista en la rama por defecto). En el commit final `85905f3` **pasan todos los jobs**:
+
+| Workflow / job | Resultado |
+|---|---|
+| `CI LBA Print Server` → `Servidor — API, cola, rendering, simulador` | ✅ pytest, suite de despliegue, tests Node, smoke E2E y paquetes |
+| `CI LBA Print Server` → `Servidor — instalar el tar.gz en un venv limpio` | ✅ deps + `init_db` + `import app.main` sobre el paquete descomprimido |
+| `CI instalación Linux` → paquete limpio en **Debian 12**, **Debian 13**, **Ubuntu 24.04** y **Xubuntu 24.04** | ✅ instalación limpia en contenedor para las cuatro imágenes |
+| `CI instalación Linux` → `install.sh` con **systemd real** en **Debian 12** y **Ubuntu 24.04** | ✅ unidades activas, healthcheck, impresión por la cola, reinicio y reinstalación idempotente |
+| `CI estrés y concurrencia` → 300/3/3, 150/1/1 y ráfaga 80×16 | ✅ 3 jobs verdes (documentos, hashes, `integrity_check`) |
+| `CI Odoo 19 — LBA Print Connector` | ✅ instalación limpia, TransactionCase y actualización del addon |
+| `CI Odoo 19 — E2E de navegador` | ✅ Odoo 19 + addon + Chromium: login, lista de impresoras, «Probar conexión», sincronización, vista previa, «Impresión de prueba» → trabajo `sent` + documento escrito por la impresora virtual |
+
+Tiempos observados en el runner: matriz de distros ~25–45 s por job; systemd ~35 s; estrés ~10 s por escenario; E2E de navegador ~6 min (clonado de Odoo, pip y Chromium incluidos).
+
+### Defectos encontrados por los flujos nuevos y corregidos
+
+1. `preview.render_preview` entraba en **bucle infinito** ante un comando `ESC` desconocido; ahora consume el comando y hay test de regresión.
+2. `install.sh` comprobaba la salud una sola vez tras 2 s; ahora espera readiness hasta 60 s y falla con diagnóstico.
+3. **`umask 077` en `install.sh`** dejaba `/opt/lba/server/.venv` en `0700 root:root`: `init_db` como usuario `lba` fallaba con `Permission denied` y el servicio no habría podido ejecutar su intérprete. El umask restrictivo queda solo para el log; el árbol se instala con `022` y el test systemd verifica que `lba` ejecuta el venv.
+4. **Ubuntu 22.04 no es soportado**: trae Python 3.10 y `sqlalchemy>=2.1`/FastAPI actual exigen ≥ 3.11. Se retiró de la matriz, se añadió Debian 13 y tanto `install.sh` como `verify_clean_install.sh` abortan con un mensaje explícito en lugar de un error de pip.
+5. El E2E hacía `mkdir` sobre variables de `$GITHUB_ENV` en el mismo step que las definía (`mkdir: cannot create directory ''`).
+6. **El asistente de «Impresión de prueba» fallaba con `AccessError`** para usuarios TPV: `lba.print.job.create` bloquea a los usuarios POS y el asistente no usaba `sudo()` aunque el documento lo genera el servidor. Corregido y cubierto por el E2E de navegador.
+7. El test de systemd usaba `sudo` (no instalado en la imagen base) y luego importaba `app.main` sin cargar `lba-print.env` ni el directorio de trabajo de la unidad; ahora usa `runuser` y replica el entorno del servicio.
 
 ### Límites explícitos de esta evidencia
 
-1. Los workflows nuevos **no se han ejecutado en GitHub** desde este sandbox: no hay Docker ni Actions aquí, así que la matriz de distros, la instalación con systemd real y el E2E de Odoo/Chromium están definidos y validados solo en sintaxis y en sus componentes locales. No se declara que estén verdes.
-2. El E2E de navegador depende de selectores de la UI de Odoo 19 (acción por xmlid, botones y notificaciones); si Odoo cambia el DOM, el job fallará y habrá que ajustar selectores. No se observó ninguna ejecución real de Playwright contra Odoo en este entorno.
-3. La instalación con systemd se validó localmente solo por revisión y pruebas unitarias con mocks; el flujo real requiere el contenedor privilegiado de CI. No se probó en un LXC de producción ni tras reiniciar el host.
-4. La impresora virtual demuestra que los bytes llegaron a un socket y se materializaron como documento; **no** demuestra impresión térmica, legibilidad física, corte ni calibración. Sigue vigente que `sent` significa «bytes transmitidos», no papel impreso.
-5. No se cubren otras familias Linux (Fedora/RHEL/Arch): `install.sh` exige `apt-get`/systemd Debian-Ubuntu; el paquete Python podría funcionar, pero no se afirma soporte.
-6. Las pruebas de estrés usan SQLite/WAL y procesos locales; no modelan disco lleno, red lenta, cortes de energía ni caída entre `sendall` y commit. No se afirma exactly-once.
-7. No se ejecutaron pruebas físicas ni se contactó la base ni la LAN de Lo D’ Leo.
+1. La matriz valida **contenedores** `debian:12`, `debian:13`, `ubuntu:24.04` y `ubuntu:24.04` + XFCE (aproximación a Xubuntu: misma base y repositorios, sin la ISO de escritorio completa). No se probó una instalación de escritorio real ni un arranque gráfico.
+2. La instalación con systemd corre en un contenedor privilegiado con systemd como PID 1; valida unidades, permisos, servicios y reinstalación, pero **no** un LXC de producción, un reinicio del host ni el firewall/red reales.
+3. Solo arquitectura `x86_64`. No se cubren Fedora/RHEL/Arch: `install.sh` exige `apt-get` + systemd Debian/Ubuntu.
+4. La impresora virtual demuestra que los bytes llegaron a un socket y se materializaron como documento (`*.escpos.bin`, `*.txt`, `documents.jsonl`); **no** demuestra impresión térmica, legibilidad física, corte ni calibración. `sent` sigue significando «bytes transmitidos», no papel impreso.
+5. El E2E de navegador depende del DOM y de los xmlid de Odoo 19 en el commit fijado; un cambio de Odoo puede romper selectores. Se ejecutó una sola vez verde, no de forma repetida contra varias versiones.
+6. Las pruebas de estrés usan SQLite/WAL y procesos locales en el runner; no modelan disco lleno, red lenta, cortes de energía ni caída entre `sendall` y commit. No se afirma exactly-once.
+7. El PR sigue en **borrador** y no se ha fusionado a `main`; no hay release ni despliegue. No se ejecutaron pruebas físicas ni se contactó la base ni la LAN de Lo D’ Leo.
