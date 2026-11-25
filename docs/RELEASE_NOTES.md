@@ -50,7 +50,7 @@ configura el servidor LBA y su token, y ejecuta «Probar conexión» y
 
 ## Verificación de esta release
 
-El commit de la release pasó: 62 tests de servidor, 24 de despliegue, tests Node,
+El commit de la release pasó: 65 tests de servidor, 24 de despliegue, tests Node,
 instalación limpia del paquete en venv aislado, paquete limpio en Debian 12/13,
 Ubuntu 24.04 y Xubuntu 24.04, `install.sh` con systemd real en Debian 12 y
 Ubuntu 24.04, estrés 300/3/3 + 150/1/1 + ráfaga 80×16, instalación/upgrade y

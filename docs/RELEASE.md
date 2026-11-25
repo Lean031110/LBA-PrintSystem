@@ -28,7 +28,8 @@ bytecode y lo compila al cargar el módulo, por lo que «compilado» aquí signi
 El workflow `release.yml` solo publica si pasan estos gates sobre el commit
 tageado:
 
-1. suite del servidor (`pytest`, 62 tests);
+1. suite del servidor (`pytest`, 65 tests, incluidos los de inicialización
+   concurrente de SQLite);
 2. suite de despliegue (`unittest`, 24 pruebas con mocks y rutas temporales);
 3. tests Node del addon;
 4. construcción reproducible de los tres paquetes;
