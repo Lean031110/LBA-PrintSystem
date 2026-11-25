@@ -8,6 +8,7 @@
 | Componente | Requisito | Origen |
 |---|---|---|
 | LBA Print Server | **Python ≥ 3.11** (probado 3.12); Debian 12, Debian 13, Ubuntu 24.04 y Xubuntu 24.04 en CI. Ubuntu 22.04 (Python 3.10) **no es soportado**: SQLAlchemy 2.1/FastAPI actual exigen ≥ 3.11 y el instalador lo rechaza con un mensaje explícito | Matriz de CI (`ci-install-matrix.yml`); LXC real pendiente |
+| LBA Print Server — Docker | Imagen `ghcr.io/lean031110/lba-print-system` (Debian 12, Python 3.12, usuario uid 10001, solo `linux/amd64`) | CI `ci-docker.yml`: build + smoke con API, worker, impresora virtual, reinicio y persistencia. No probada en Docker Desktop/ARM ni Kubernetes |
 | FastAPI / SQLAlchemy / Jinja2 / HTMX 2.0.4 (vendorizado) | — | [V] `server/requirements.txt` |
 | python-escpos | **3.1** (2023-12-17, MIT), Python 3.8–3.12 | [V] https://pypi.org/project/python-escpos/ |
 | Odoo 19 Community | Python **≥ 3.10** (`setup.py`, `MIN_PY_VERSION=(3,10)`), recomendado 3.11/3.12 | [V] clon rama 19.0; guías de instalación 2026 |

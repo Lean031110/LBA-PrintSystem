@@ -59,7 +59,7 @@ def add_tar_entry(out: tarfile.TarFile, original: tarfile.TarInfo, name: str,
 
 
 def build_server_tar(repo: Path, revision: str, epoch: int, build_info: bytes) -> bytes:
-    sources = archive_sources(repo, revision, ["server", "deploy", "README.md", "CHANGELOG.md", "LICENSE", "docs"])
+    sources = archive_sources(repo, revision, ["server", "deploy", "docker", "VERSION", "README.md", "CHANGELOG.md", "LICENSE", "docs"])
     tar_bytes = io.BytesIO()
     with tarfile.open(fileobj=tar_bytes, mode="w", format=tarfile.PAX_FORMAT) as out:
         for original, data in sources:
@@ -79,6 +79,8 @@ def build_server_tar(repo: Path, revision: str, epoch: int, build_info: bytes) -
         names = set(check.getnames())
         required = {
             "lba-print-server/BUILD-INFO.txt",
+            "lba-print-server/VERSION",
+            "lba-print-server/docker/Dockerfile",
             "lba-print-server/server/requirements.txt",
             "lba-print-server/LICENSE",
             "lba-print-server/CHANGELOG.md",

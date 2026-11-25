@@ -671,3 +671,64 @@ Tiempos observados en el runner: matriz de distros ~25–45 s por job; systemd ~
 5. El E2E de navegador depende del DOM y de los xmlid de Odoo 19 en el commit fijado; un cambio de Odoo puede romper selectores. Se ejecutó una sola vez verde, no de forma repetida contra varias versiones.
 6. Las pruebas de estrés usan SQLite/WAL y procesos locales en el runner; no modelan disco lleno, red lenta, cortes de energía ni caída entre `sendall` y commit. No se afirma exactly-once.
 7. El PR sigue en **borrador** y no se ha fusionado a `main`; no hay release ni despliegue. No se ejecutaron pruebas físicas ni se contactó la base ni la LAN de Lo D’ Leo.
+
+## Addendum — release 1.0.0, imagen Docker y declaración de producción (2026-11-25)
+
+Este addendum cierra la entrega: `main` recibe los cambios de QA, se publica la
+primera release estable con paquetes reproducibles y el addon de Odoo, y la
+imagen Docker queda publicada y probada. Las secciones anteriores describen
+cortes previos y conservan su valor histórico.
+
+### Nuevo alcance empaquetado
+
+| Elemento | Verificación |
+|---|---|
+| `docker/Dockerfile` + `docker/entrypoint.sh` | Imagen `python:3.12-slim-bookworm`, usuario no-root `lba` (uid 10001), `/data` persistente, healthcheck, `tini`, roles `all/api/worker/simulator` |
+| `docker/docker-compose.yml` | API + worker con volumen compartido y espera a health; perfil `simulator` para impresora virtual |
+| `deploy/scripts/build_install_bundle.py` | `lba-print-system-1.0.0-install.tar.gz` reproducible con servidor, scripts, systemd, Docker, addon, docs y `install.sh` raíz; valida contenido y modos |
+| `.github/workflows/release.yml` | Tag `v*` → gates → tres paquetes + `SHA256SUMS` → imagen GHCR → release de GitHub |
+| `.github/workflows/ci-docker.yml` + `deploy/ci/docker_smoke_test.sh` | Build y smoke real: uid no-root, health, impresión a impresora virtual, trabajo `sent`, documento en `documents.jsonl`, persistencia tras reinicio y `docker compose config` |
+
+### Evidencia ejecutada para esta entrega
+
+- Suite del servidor sobre el árbol final: **62 passed, 46 warnings** conocidos.
+- Suite de despliegue: **24 passed** (mocks, rutas temporales, sin tocar `/etc`
+  ni systemd del host).
+- Paquete completo construido desde el commit y verificado: `install.sh` en modo
+  0755, `BUILD-INFO.txt`, ausencia de `.venv`/`.pyc`, `sha256sum` calculado.
+- Los checks de GitHub Actions sobre el commit fusionado en `main` incluyen los
+  cinco workflows previos (instalación limpia, matriz Linux, systemd, estrés,
+  Odoo 19 + E2E) más Docker; la release solo se crea si el workflow de release
+  pasa sus propios gates.
+- Los artefactos publicados se descargan de la release y se verifica
+  `sha256sum -c SHA256SUMS` y la presencia de la imagen en GHCR con el tag
+  `1.0.0`.
+
+### Defectos corregidos en esta entrega
+
+1. El paquete del servidor no incluía `VERSION` ni `docker/`, por lo que no era
+   autosuficiente para instalar con Docker desde el tar.gz; ahora se incluyen y
+   se exige su presencia al construir.
+2. El entrypoint Docker falla de forma explícita si el volumen no pertenece al
+   uid 10001, en lugar de arrancar y fallar después al escribir SQLite.
+3. El compose declaraba el healthcheck de la imagen también para el worker, que
+   no sirve HTTP; se desactiva solo en ese servicio.
+4. El workflow de release habría publicado una versión distinta a la del código;
+   ahora aborta si el tag y `VERSION` no coinciden.
+
+### Declaración de producción y sus límites
+
+**1.0.0 se declara lista para producción** en el alcance verificado: Linux amd64
+(Debian 12/13, Ubuntu 24.04, Xubuntu 24.04, Python ≥ 3.11) o Docker en red
+local, con Odoo 19 Community e impresoras ESC/POS de red.
+
+Quedan fuera de la declaración, y así se documenta en `docs/RELEASE.md` §5:
+
+1. Impresión térmica física y confirmación de papel (`sent` ≠ impreso).
+2. TLS/HTTPS y cookie `Secure` integrados; requieren reverse proxy.
+3. Host de producción real, LXC real y reinicio del host.
+4. Arquitecturas distintas de `amd64` y distribuciones sin `apt-get`.
+5. Alta disponibilidad, clúster o varias instancias sobre la misma SQLite.
+6. Odoo Enterprise/Online y versiones distintas de 19 Community.
+7. Recuperación ante pérdida total del servidor (backup/restore probados con
+   mocks y rutas temporales, no con un desastre real).

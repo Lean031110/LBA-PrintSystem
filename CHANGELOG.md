@@ -3,6 +3,58 @@
 Formato: por fase, con objetivos → entregables → pruebas → pendientes.
 Rama de trabajo actual: `fix/odoo19-addon-qa-layouts`; la fundación `feature/lba-print-foundation` no se modificó.
 
+## [1.0.0] — 2026-11-25 — PRIMERA RELEASE ESTABLE
+
+### Entregables
+
+- **Imagen Docker de producción** (`docker/`): `python:3.12-slim-bookworm`, usuario
+  no-root `lba` (uid 10001), `/data` persistente, healthcheck, `tini` como PID 1,
+  roles `LBA_ROLE=all|api|worker|simulator` y `docker-compose.yml` con API,
+  worker y perfil opcional de impresora virtual. Publicada en
+  `ghcr.io/lean031110/lba-print-system:1.0.0`.
+- **Paquete completo de instalación** (`deploy/scripts/build_install_bundle.py`):
+  `lba-print-system-1.0.0-install.tar.gz` con servidor, scripts, systemd,
+  Docker, addon Odoo, documentación y un `install.sh` en la raíz. Construcción
+  reproducible desde el commit, con `BUILD-INFO.txt` y verificación de
+  contenido/modos.
+- **Release automatizada** (`.github/workflows/release.yml`): al publicar un tag
+  `v*` valida la versión contra `VERSION`, ejecuta los gates, genera los tres
+  paquetes y `SHA256SUMS`, publica la imagen en GHCR y adjunta todo a la
+  release de GitHub.
+- **CI Docker** (`.github/workflows/ci-docker.yml` +
+  `deploy/ci/docker_smoke_test.sh`): construye la imagen y prueba en
+  contenedores reales health, uid no-root, impresora virtual, trabajo `sent`,
+  documento en disco, persistencia tras reinicio y validez del compose.
+- **Documentación de entrega**: `docs/INSTALL.md`, `docs/DOCKER.md`,
+  `docs/RELEASE.md` (artefactos, verificación y límites), notas de release y
+  README con las tres vías de instalación.
+- `VERSION` = `1.0.0`; `APP_VERSION` del servidor = `1.0.0`. El addon mantiene
+  `19.0.1.0.0` y se distribuye como ZIP instalable en Odoo 19.
+- `build_packages.py` incluye ahora `VERSION` y `docker/` en el paquete del
+  servidor, de modo que ese tar.gz también es autosuficiente.
+
+### Verificación
+
+- Suite del servidor: **62 passed** (46 warnings conocidos).
+- Suite de despliegue: **24 passed** (mocks y rutas temporales).
+- Cinco workflows de CI verdes sobre el commit fusionado: servidor, venv limpio,
+  matriz Debian 12/13/Ubuntu 24.04/Xubuntu 24.04, `install.sh` con systemd en
+  Debian 12 y Ubuntu 24.04, estrés 300/3/3 + 150/1/1 + ráfaga 80×16, Odoo 19
+  (instalación, TransactionCase, upgrade), E2E de navegador con impresora
+  virtual y Docker (build + smoke).
+- La release publicada contiene `lba-print-system-1.0.0-install.tar.gz`,
+  `lba-print-server-debian12-amd64.tar.gz`,
+  `lba_print_connector-19.0.1.0.0.zip`, `MANIFEST.txt` y `SHA256SUMS`;
+  `sha256sum -c` pasa sobre los artefactos descargados.
+
+### Declaración
+
+Release declarada **lista para producción** en el alcance verificado: servidor
+Linux amd64 (Debian 12/13, Ubuntu/Xubuntu 24.04, Python ≥ 3.11) o Docker en red
+local, con Odoo 19 Community. No cubre impresión física, TLS integrado,
+arquitecturas no amd64 ni alta disponibilidad; los límites completos están en
+`docs/RELEASE.md` §5 y `docs/FINAL_AUDIT.md`.
+
 ## Corrección de CI Odoo y artefactos QA — 2026-11-23 (sin release)
 
 - En el commit de código `49f7249be25e518844de6d7fb5ea427ef08ef7dc` se corrigieron tres fixtures `res.users` que utilizaban el campo inexistente `groups_id`; Odoo 19 en el commit oficial fijado `62c2f793058de87ff453532f206a96a1e71845d2` declara `group_ids` (`odoo/addons/base/models/res_users.py:257`). El test de `action_process_now` usa `autospec=True` para verificar el recordset seleccionado sin cambiar el método productivo ni sus controles.

@@ -1,0 +1,73 @@
+# ============================================================================
+# LBA Print System — despliegue con Docker Compose.
+#
+#   cd docker && docker compose up -d
+#   docker compose --profile simulator up -d     # + impresora virtual
+#
+# La imagen se publica en ghcr.io/lean031110/lba-print-system. Para construirla
+# localmente: LBA_IMAGE=lba-print-system:local docker compose up -d --build
+# ============================================================================
+name: lba-print-system
+
+services:
+  api:
+    image: ${LBA_IMAGE:-ghcr.io/lean031110/lba-print-system:1.0.0}
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        LBA_VERSION: ${LBA_VERSION:-dev}
+    environment:
+      LBA_ROLE: api
+      LBA_DATA_DIR: /data
+      LBA_HOST: 0.0.0.0
+      LBA_PORT: "8000"
+      LBA_ADMIN_PASSWORD: ${LBA_ADMIN_PASSWORD:-}
+      LBA_API_TOKEN: ${LBA_API_TOKEN:-}
+    ports:
+      - "${LBA_PORT:-8000}:8000"
+    volumes:
+      - lba-data:/data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  worker:
+    image: ${LBA_IMAGE:-ghcr.io/lean031110/lba-print-system:1.0.0}
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        LBA_VERSION: ${LBA_VERSION:-dev}
+    environment:
+      LBA_ROLE: worker
+      LBA_DATA_DIR: /data
+    volumes:
+      - lba-data:/data
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      disable: true
+
+  simulator:
+    profiles: ["simulator"]
+    image: ${LBA_IMAGE:-ghcr.io/lean031110/lba-print-system:1.0.0}
+    environment:
+      LBA_ROLE: simulator
+      LBA_DATA_DIR: /data
+      LBA_SIM_PORT: "9910"
+      LBA_SIM_SAVE_DIR: /data/simulated-printer
+    ports:
+      - "${LBA_SIM_PORT:-9910}:9910"
+    volumes:
+      - lba-data:/data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  lba-data:

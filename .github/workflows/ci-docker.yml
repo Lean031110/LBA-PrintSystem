@@ -1,0 +1,34 @@
+name: CI Docker — imagen y prueba de humo
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docker-image:
+    name: Imagen Docker — build y smoke real (API + worker + impresora virtual)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dependencias de la prueba
+        run: |
+          python3 -c 'import json, sys; print(sys.version)'
+          curl --version | head -1
+
+      - name: Construir la imagen y ejecutar la prueba de humo
+        env:
+          LBA_SMOKE_PORT: "18000"
+        run: bash deploy/ci/docker_smoke_test.sh lba-print:ci
+
+      - name: Diagnóstico si falla
+        if: failure()
+        run: |
+          docker images | head -5
+          docker ps -a | head -10

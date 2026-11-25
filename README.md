@@ -1,6 +1,6 @@
 # LBA PRINT SYSTEM
 
-Sistema de impresión térmica para **Odoo 19 Community** en red local, sin nube y sin Docker. Se limita a impresión ESC/POS de red y puede coexistir con las impresoras y periféricos nativos de Odoo; no pretende reemplazar todas las capacidades de IoT Box. Consta de dos componentes:
+Sistema de impresión térmica para **Odoo 19 Community** en red local, sin nube. Se limita a impresión ESC/POS de red y puede coexistir con las impresoras y periféricos nativos de Odoo; no pretende reemplazar todas las capacidades de IoT Box. Se instala con el paquete systemd o con la imagen Docker publicada. Consta de dos componentes:
 
 | Componente | Tecnología | Qué hace |
 |---|---|---|
@@ -23,7 +23,32 @@ Sistema de impresión térmica para **Odoo 19 Community** en red local, sin nube
 | [docs/SECURITY.md](docs/SECURITY.md) | Modelo de amenazas y mitigaciones |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Fases con objetivos y criterios de aceptación |
 | [docs/FINAL_AUDIT.md](docs/FINAL_AUDIT.md) | Hallazgos, correcciones, evidencia y gates pendientes de esta auditoría |
+| [docs/INSTALL.md](docs/INSTALL.md) | Instalación desde la release: paquete completo, Docker y código fuente |
+| [docs/DOCKER.md](docs/DOCKER.md) | Imagen Docker, compose, variables y operación |
+| [docs/RELEASE.md](docs/RELEASE.md) | Artefactos de release, verificación y declaración de producción |
 | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Guía de usuario del panel y del conector |
+
+## Releases e instalación
+
+Cada release publica el **paquete completo** (`lba-print-system-<versión>-install.tar.gz`)
+con todos los scripts, la **imagen Docker** (`ghcr.io/lean031110/lba-print-system`)
+y el **ZIP del addon Odoo 19** listo para importar, además de `SHA256SUMS` y
+`MANIFEST.txt`.
+
+```bash
+# systemd (Debian 12/13, Ubuntu/Xubuntu 24.04, Python >= 3.11)
+tar -xzf lba-print-system-1.0.0-install.tar.gz
+cd lba-print-system-1.0.0 && sudo ./install.sh
+
+# Docker
+docker run -d --name lba-print -p 8000:8000 -v lba-data:/data \
+  ghcr.io/lean031110/lba-print-system:1.0.0
+```
+
+Guías: [INSTALL](docs/INSTALL.md) · [DOCKER](docs/DOCKER.md) · [RELEASE](docs/RELEASE.md).
+La release 1.0.0 se declara lista para producción en el alcance verificado; los
+límites (hardware físico, TLS, amd64, SQLite) están en [RELEASE](docs/RELEASE.md) §5.
+
 
 ## Arranque rápido (desarrollo, sin impresora)
 
@@ -48,7 +73,10 @@ Primer recorrido: **Dispositivos → Añadir** (IP 127.0.0.1, puerto 9910) → *
 
 ## Instalación de producción
 
-Ver [docs/PROXMOX_INSTALLATION.md](docs/PROXMOX_INSTALLATION.md) (LXC Debian 12 no privilegiado, 1 CPU/1 GB/8 GB, systemd, backup).
+Desde la release (recomendado): [docs/INSTALL.md](docs/INSTALL.md).
+Para un LXC no privilegiado: [docs/PROXMOX_INSTALLATION.md](docs/PROXMOX_INSTALLATION.md)
+(Debian 12, 1 CPU/1 GB/8 GB, systemd, backup). Con contenedores:
+[docs/DOCKER.md](docs/DOCKER.md).
 
 ## Pruebas
 
@@ -103,10 +131,11 @@ lba-print-system/
 ├── odoo_addons/lba_print_connector/   # addon Odoo 19
 │   ├── models/ controllers/ security/ views/ data/ tests/
 │   └── static/src/{js,xml,scss}
+├── docker/                 # Dockerfile, entrypoint y docker-compose
 ├── deploy/
 │   ├── proxmox/            # creación del LXC
 │   ├── systemd/            # servicios (API, worker, simulador)
-│   └── scripts/            # install / update / backup / restore / uninstall
+│   └── scripts/            # install / update / backup / restore / uninstall / build
 └── docs/                   # documentación técnica
 ```
 
