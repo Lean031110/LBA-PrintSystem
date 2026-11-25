@@ -21,8 +21,8 @@ jobs:
           - name: Debian 12 (base del LXC objetivo)
             image: debian:12
             extra: ""
-          - name: Ubuntu 22.04 LTS
-            image: ubuntu:22.04
+          - name: Debian 13
+            image: debian:13
             extra: ""
           - name: Ubuntu 24.04 LTS
             image: ubuntu:24.04
@@ -42,6 +42,9 @@ jobs:
           IMAGE: ${{ matrix.image }}
           EXTRA: ${{ matrix.extra }}
         run: |
+          set -euo pipefail
+          LOG="$RUNNER_TEMP/clean-${{ strategy.job-index }}.log"
+          set +e
           docker run --rm \
             -v "$GITHUB_WORKSPACE:/src:ro" \
             -v "$RUNNER_TEMP/lba-package:/pkg:ro" \
@@ -54,7 +57,14 @@ jobs:
               cp -a /src /tmp/src
               bash /tmp/src/deploy/scripts/verify_clean_install.sh \
                 /pkg/lba-print-server-debian12-amd64.tar.gz
-            '
+            ' 2>&1 | tee "$LOG"
+          rc=${PIPESTATUS[0]}
+          set -e
+          if (( rc != 0 )); then
+            message="$(tail -c 3500 "$LOG" | tr '\n' '|' | tr -d '\r')"
+            echo "::error title=Instalación fallida en ${IMAGE}::$message"
+            exit "$rc"
+          fi
 
   systemd-install:
     name: install.sh con systemd real en ${{ matrix.name }}
@@ -83,11 +93,22 @@ jobs:
           TAG: ${{ matrix.tag }}
         run: |
           set -euo pipefail
+          LOG="$RUNNER_TEMP/systemd-$TAG.log"
           docker run -d --name lba-systemd --privileged --cgroupns=host \
             -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
             -v "$GITHUB_WORKSPACE:/src:ro" \
             "lba-systemd:$TAG"
-          trap 'docker logs lba-systemd || true; docker rm -f lba-systemd || true' EXIT
+          cleanup() {
+            rc=$?
+            if (( rc != 0 )); then
+              docker logs lba-systemd >> "$LOG" 2>&1 || true
+              message="$(tail -c 3500 "$LOG" | tr '\n' '|' | tr -d '\r')"
+              echo "::error title=systemd $TAG falló::$message"
+            fi
+            docker rm -f lba-systemd >/dev/null 2>&1 || true
+            exit "$rc"
+          }
+          trap cleanup EXIT
           for _ in $(seq 1 90); do
             state="$(docker exec lba-systemd systemctl is-system-running 2>/dev/null || true)"
             case "$state" in
@@ -95,5 +116,14 @@ jobs:
             esac
             sleep 1
           done
-          docker exec lba-systemd systemctl is-system-running || true
-          docker exec lba-systemd bash /src/deploy/ci/test_systemd_install.sh
+          echo "estado systemd: $(docker exec lba-systemd systemctl is-system-running || true)" | tee -a "$LOG"
+          set +e
+          docker exec lba-systemd bash /src/deploy/ci/test_systemd_install.sh 2>&1 | tee -a "$LOG"
+          rc=${PIPESTATUS[0]}
+          set -e
+          if (( rc != 0 )); then
+            docker logs lba-systemd >> "$LOG" 2>&1 || true
+            message="$(tail -c 3500 "$LOG" | tr '\n' '|' | tr -d '\r')"
+            echo "::error title=systemd $TAG falló::$message"
+            exit "$rc"
+          fi

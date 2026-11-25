@@ -89,6 +89,12 @@ chown -R root:root "$INSTALL_DIR"
 
  echo "== 3) Entorno Python y dependencias (caché persistente/reintentos) =="
 python3 -m venv "$INSTALL_DIR/server/.venv"
+# SQLAlchemy 2.1 y FastAPI actual exigen Python >= 3.11. Debian 12 y
+# Ubuntu 24.04 ya lo traen; Ubuntu 22.04 (3.10) no es soportado.
+if ! "$INSTALL_DIR/server/.venv/bin/python" -c \
+        'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)'; then
+    lba_die "se requiere Python >= 3.11 (Debian 12+/Ubuntu 24.04+); esta imagen trae $("$INSTALL_DIR/server/.venv/bin/python" -V 2>&1)."
+fi
 export PIP_CACHE_DIR PIP_DISABLE_PIP_VERSION_CHECK=1
 PIP_INSTALL_OPTIONS=()
 if [[ -n "${LBA_PIP_INDEX_URL:-}" ]]; then

@@ -48,7 +48,8 @@ jobs:
           echo "ODOO_ADDONS=${RUNNER_TEMP}/odoo/addons,${GITHUB_WORKSPACE}/odoo_addons" >> "$GITHUB_ENV"
           echo "PRINTER_DOCS=${RUNNER_TEMP}/printer-documents" >> "$GITHUB_ENV"
           echo "SCREENSHOTS=${RUNNER_TEMP}/screenshots" >> "$GITHUB_ENV"
-          mkdir -p "$PRINTER_DOCS" "$SCREENSHOTS"
+          # Las variables de GITHUB_ENV no existen todavía en este mismo step.
+          mkdir -p "${RUNNER_TEMP}/printer-documents" "${RUNNER_TEMP}/screenshots"
 
       - name: Python 3.12
         uses: actions/setup-python@v5

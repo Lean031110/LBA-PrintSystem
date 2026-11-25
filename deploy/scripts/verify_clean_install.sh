@@ -47,6 +47,12 @@ echo "paquete: $PACKAGE"
 echo "python:  $($PYTHON_BIN --version 2>&1)"
 echo "workdir: $WORK_DIR"
 
+"$PYTHON_BIN" - <<'PY' || fail "se requiere Python >= 3.11 (Debian 12+, Ubuntu 24.04+)"
+import sys
+print(f"   versión Python compatible: {sys.version.split()[0]}")
+raise SystemExit(0 if sys.version_info >= (3, 11) else 1)
+PY
+
 tar -xzf "$PACKAGE" -C "$WORK_DIR"
 SRC="$WORK_DIR/lba-print-server"
 [[ -d "$SRC/server/app" ]] || fail "el paquete no contiene server/app"
