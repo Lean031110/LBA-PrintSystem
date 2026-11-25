@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import os
+import time
 from datetime import datetime, timezone
 
 from sqlalchemy import create_engine, event, inspect, text
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.core import config
@@ -84,6 +85,25 @@ def init_db() -> None:
             columns = {c["name"] for c in inspect(get_engine()).get_columns("jobs")}
             if "claim_expires_at" not in columns:
                 raise
+    # La API y el worker pueden inicializar a la vez una BD nueva (contenedor
+    # Docker con LBA_ROLE=all, dos servicios recién instalados). El primer
+    # proceso que inserta los ajustes gana; el otro debe reintentar en lugar
+    # de abortar con UNIQUE(settings.key) o una escritura bloqueada.
+    last_error: Exception | None = None
+    for attempt in range(3):
+        with get_sessionmaker()() as db:
+            try:
+                models.ensure_default_settings(db)
+                db.commit()
+                return
+            except (IntegrityError, OperationalError) as exc:
+                db.rollback()
+                last_error = exc
+        time.sleep(0.1 * (attempt + 1))
+    # Si otro proceso ya sembró los ajustes, la inicialización es correcta.
     with get_sessionmaker()() as db:
-        models.ensure_default_settings(db)
-        db.commit()
+        if (models.get_setting(db, "admin") is not None
+                and models.get_setting(db, "api_tokens") is not None):
+            return
+    assert last_error is not None
+    raise last_error

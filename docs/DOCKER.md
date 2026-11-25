@@ -92,7 +92,8 @@ LBA_IMAGE=lba-print-system:local docker compose up -d --build
 ## 4. Operación
 
 - **Persistencia:** todo lo importante vive en `/data`. Sin volumen, los datos
-  desaparecen al recrear el contenedor.
+  desaparecen al recrear el contenedor. El esquema y las credenciales se
+  inicializan una sola vez al arrancar (antes de lanzar API y worker).
 - **Copia de seguridad:** `docker run --rm -v lba-data:/data -v "$PWD:/backup"
   ghcr.io/lean031110/lba-print-system:1.0.0 sh -c 'sqlite3 /data/lba.db ".backup /backup/lba.db"'`
   y copia también `/data/secret_key` y `/data/initial_credentials.txt`.

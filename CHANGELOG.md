@@ -35,7 +35,8 @@ Rama de trabajo actual: `fix/odoo19-addon-qa-layouts`; la fundación `feature/lb
 
 ### Verificación
 
-- Suite del servidor: **62 passed** (46 warnings conocidos).
+- Suite del servidor: **65 passed** (46 warnings conocidos), incluidos tres tests
+  nuevos de inicialización concurrente de SQLite.
 - Suite de despliegue: **24 passed** (mocks y rutas temporales).
 - Cinco workflows de CI verdes sobre el commit fusionado: servidor, venv limpio,
   matriz Debian 12/13/Ubuntu 24.04/Xubuntu 24.04, `install.sh` con systemd en
@@ -46,6 +47,15 @@ Rama de trabajo actual: `fix/odoo19-addon-qa-layouts`; la fundación `feature/lb
   `lba-print-server-debian12-amd64.tar.gz`,
   `lba_print_connector-19.0.1.0.0.zip`, `MANIFEST.txt` y `SHA256SUMS`;
   `sha256sum -c` pasa sobre los artefactos descargados.
+
+### Defecto corregido durante la entrega
+
+La API y el worker podían inicializar una base nueva al mismo tiempo (arranque
+en contenedor) y el segundo proceso abortaba con `UNIQUE constraint failed:
+settings.key`, dejando el servicio sin API. `init_db()` reintenta la siembra de
+ajustes ante `IntegrityError`/`OperationalError`, el entrypoint Docker inicializa
+el esquema una vez antes de lanzar los procesos, y hay tres regresiones en
+`server/tests/test_init_concurrency.py`.
 
 ### Declaración
 

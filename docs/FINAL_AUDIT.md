@@ -691,7 +691,7 @@ cortes previos y conservan su valor histórico.
 
 ### Evidencia ejecutada para esta entrega
 
-- Suite del servidor sobre el árbol final: **62 passed, 46 warnings** conocidos.
+- Suite del servidor sobre el árbol final: **65 passed, 46 warnings** conocidos.
 - Suite de despliegue: **24 passed** (mocks, rutas temporales, sin tocar `/etc`
   ni systemd del host).
 - Paquete completo construido desde el commit y verificado: `install.sh` en modo
@@ -715,6 +715,16 @@ cortes previos y conservan su valor histórico.
    no sirve HTTP; se desactiva solo en ese servicio.
 4. El workflow de release habría publicado una versión distinta a la del código;
    ahora aborta si el tag y `VERSION` no coinciden.
+5. **La API y el worker podían inicializar una BD nueva a la vez** y el segundo
+   proceso abortaba con `UNIQUE constraint failed: settings.key` (reproducido 1
+   de 3 veces en local), dejando el contenedor sin API. `init_db()` reintenta la
+   siembra de ajustes ante `IntegrityError`/`OperationalError` y el entrypoint
+   Docker inicializa el esquema una sola vez antes de arrancar los procesos; 5/5
+   arranques concurrentes quedaron sanos y hay tres tests de regresión
+   (`server/tests/test_init_concurrency.py`).
+6. El smoke test Docker registraba la impresora con el nombre del contenedor,
+   pero la API exige una IP literal por el control anti-SSRF; ahora resuelve la
+   IP de la red Docker antes de crear la impresora.
 
 ### Declaración de producción y sus límites
 

@@ -39,11 +39,20 @@ api_cmd=(uvicorn app.main:app --host "${LBA_HOST}" --port "${LBA_PORT}" --proxy-
 worker_cmd=(python -m app.worker)
 sim_cmd=(python -m app.drivers.simulator --host 0.0.0.0 --port "${LBA_SIM_PORT}" --save-dir "${LBA_SIM_SAVE_DIR}")
 
+# Crea esquema y credenciales una sola vez antes de arrancar procesos, para
+# que la API y el worker no compitan al inicializar una BD nueva.
+init_database() {
+    echo "· inicializando SQLite en ${LBA_DB_PATH}"
+    python -c 'from app.database.db import init_db; init_db()'
+}
+
 case "${ROLE}" in
     api)
+        init_database
         exec "${api_cmd[@]}"
         ;;
     worker)
+        init_database
         exec "${worker_cmd[@]}"
         ;;
     simulator)
@@ -51,6 +60,7 @@ case "${ROLE}" in
         exec "${sim_cmd[@]}"
         ;;
     all)
+        init_database
         pids=()
         cleanup() {
             for pid in "${pids[@]:-}"; do

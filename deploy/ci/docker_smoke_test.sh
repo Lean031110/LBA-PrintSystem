@@ -91,9 +91,13 @@ UID_RUNNING="$(docker exec "$API" id -u)"
 echo "uid=$UID_RUNNING (lba)"
 
 echo "== Registrar la impresora virtual por API =="
+# La API valida una IP literal (anti-SSRF): se resuelve la IP del contenedor.
+SIM_IP="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$SIM")"
+[[ -n "$SIM_IP" ]] || { echo "no se pudo resolver la IP de $SIM" >&2; exit 1; }
+echo "impresora virtual: $SIM ($SIM_IP:9910)"
 PRINTER_JSON="$(curl --fail --silent --show-error -X POST "$BASE/api/v1/printers" \
     -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-    -d "{\"name\":\"Docker smoke\",\"ip\":\"$SIM\",\"port\":9910,\"profile\":\"simulator\",\"paper_width_mm\":80,\"encoding\":\"CP850\"}")"
+    -d "{\"name\":\"Docker smoke\",\"ip\":\"$SIM_IP\",\"port\":9910,\"profile\":\"simulator\",\"paper_width_mm\":80,\"encoding\":\"CP850\"}")"
 echo "$PRINTER_JSON"
 PRINTER_ID="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])' <<<"$PRINTER_JSON")"
 
