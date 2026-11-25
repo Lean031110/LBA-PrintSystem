@@ -74,6 +74,10 @@ def render_preview(data: bytes, codec: str = "cp850", columns: int = 48) -> str:
             elif c in (0x45, 0x47, 0x61, 0x21, 0x7B, 0x4D, 0x20, 0x32, 0x33, 0x04):
                 # ESC E/G/a/!/{/M/SP/2/3/DLE-EOT: 1 argumento
                 i += 3
+            else:
+                # Comando ESC desconocido: consumirlo para no entrar en un
+                # bucle infinito con payloads que incluyan bytes de control.
+                i += 2
         elif b == 0x1D:  # GS
             if i + 1 >= n:
                 break

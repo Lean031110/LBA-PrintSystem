@@ -1,8 +1,9 @@
-name: CI LBA Print Server (pytest)
+name: CI LBA Print Server (pytest + instalación limpia)
 on:
   push:
     branches: [main, feature/lba-print-foundation, fix/odoo19-addon-qa-layouts]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   test-server:
@@ -36,3 +37,27 @@ jobs:
           name: lba-packages-${{ github.sha }}
           if-no-files-found: error
           path: ${{ runner.temp }}/lba-packages/*
+
+  clean-package-install:
+    name: Servidor — instalar el tar.gz en un venv limpio (deps + init_db + import)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Construir el paquete desde el commit probado
+        run: python deploy/scripts/build_packages.py --output "$RUNNER_TEMP/lba-clean-package"
+      - name: Descomprimir e instalar en venv aislado
+        env:
+          PYTHON_BIN: python3
+        run: |
+          bash deploy/scripts/verify_clean_install.sh \
+            "$RUNNER_TEMP/lba-clean-package/lba-print-server-debian12-amd64.tar.gz"
+      - name: Publicar paquete verificado y SHA-256
+        uses: actions/upload-artifact@v4
+        with:
+          name: clean-install-package-${{ github.sha }}
+          if-no-files-found: error
+          path: ${{ runner.temp }}/lba-clean-package/*

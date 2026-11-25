@@ -1,0 +1,186 @@
+name: CI Odoo 19 — E2E de navegador con impresora virtual
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-e2e:
+    name: Odoo 19 + addon + Chromium + impresora virtual
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: odoo
+          POSTGRES_PASSWORD: odoo
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U odoo -d postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: odoo
+      PGPASSWORD: odoo
+      ODOO_COMMIT: 62c2f793058de87ff453532f206a96a1e71845d2
+      ODOO_DB: lba_e2e
+      LBA_E2E_TOKEN: lba-e2e-token-0123456789abcdef
+      LBA_E2E_BASE_URL: http://127.0.0.1
+      LBA_E2E_PORT: "18000"
+    steps:
+      - name: Checkout LBA Print System
+        uses: actions/checkout@v4
+
+      - name: Rutas temporales
+        run: |
+          echo "ODOO_ROOT=${RUNNER_TEMP}/odoo" >> "$GITHUB_ENV"
+          echo "ODOO_ADDONS=${RUNNER_TEMP}/odoo/addons,${GITHUB_WORKSPACE}/odoo_addons" >> "$GITHUB_ENV"
+          echo "PRINTER_DOCS=${RUNNER_TEMP}/printer-documents" >> "$GITHUB_ENV"
+          echo "SCREENSHOTS=${RUNNER_TEMP}/screenshots" >> "$GITHUB_ENV"
+          mkdir -p "$PRINTER_DOCS" "$SCREENSHOTS"
+
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Dependencias de sistema (Odoo + navegador)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential libfreetype6-dev libharfbuzz-dev libfribidi-dev \
+            libjpeg-dev liblcms2-dev libldap2-dev libopenjp2-7-dev \
+            libpq-dev libsasl2-dev libssl-dev libtiff5-dev libwebp-dev \
+            libxml2-dev libxslt1-dev zlib1g-dev nodejs npm postgresql-client
+          sudo npm install --global rtlcss
+
+      - name: Clonar Odoo 19 Community (commit fijo)
+        run: |
+          git init "$ODOO_ROOT"
+          git -C "$ODOO_ROOT" remote add origin https://github.com/odoo/odoo.git
+          git -C "$ODOO_ROOT" fetch --depth 1 origin "$ODOO_COMMIT"
+          git -C "$ODOO_ROOT" checkout --detach FETCH_HEAD
+          test "$(git -C "$ODOO_ROOT" rev-parse HEAD)" = "$ODOO_COMMIT"
+          echo "Odoo upstream commit: $ODOO_COMMIT"
+
+      - name: Dependencias Python (Odoo, servidor LBA y Playwright)
+        run: |
+          python -m pip install --upgrade pip wheel
+          python -m pip install -r "$ODOO_ROOT/requirements.txt"
+          python -m pip install -r server/requirements-dev.txt
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Crear base de datos aislada
+        run: createdb --maintenance-db=postgres "$ODOO_DB"
+
+      - name: Preparar servidor LBA + impresora virtual + worker
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$GITHUB_WORKSPACE/server"
+          export LBA_DATA_DIR="$RUNNER_TEMP/lba-data"
+          export LBA_HOST=127.0.0.1
+          export LBA_PORT=18000
+          export LBA_API_TOKEN="$LBA_E2E_TOKEN"
+          export LBA_ADMIN_PASSWORD=odoo-e2e-admin
+          cd server
+          python -c 'from app.database.db import init_db; init_db()'
+          nohup python -m app.drivers.simulator --host 127.0.0.1 --port 19100 \
+            --save-dir "$PRINTER_DOCS" > "$RUNNER_TEMP/lba-simulator.log" 2>&1 &
+          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 18000 \
+            > "$RUNNER_TEMP/lba-api.log" 2>&1 &
+          nohup python -m app.worker > "$RUNNER_TEMP/lba-worker.log" 2>&1 &
+          for _ in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:18000/api/v1/health && break
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:18000/api/v1/health
+
+      - name: Registrar la impresora virtual en LBA
+        run: |
+          set -euo pipefail
+          PRINTER_JSON="$(curl -fsS -X POST http://127.0.0.1:18000/api/v1/printers \
+            -H "Authorization: Bearer $LBA_E2E_TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d '{"name":"Cocina E2E","ip":"127.0.0.1","port":19100,
+                 "profile":"simulator","paper_width_mm":80,"encoding":"CP850",
+                 "manufacturer":"LBA","model":"Virtual"}')"
+          echo "$PRINTER_JSON" | python -c \
+            'import json,sys; data=json.load(sys.stdin); assert data["id"]; print("impresora:", data["id"], data["name"])'
+
+      - name: Instalar el addon en Odoo 19 (base limpia)
+        run: |
+          set -o pipefail
+          python "$ODOO_ROOT/odoo-bin" \
+            --addons-path="$ODOO_ADDONS" \
+            --db_host="$PGHOST" --db_port="$PGPORT" \
+            --db_user="$PGUSER" --db_password="$PGPASSWORD" \
+            --database="$ODOO_DB" \
+            --init=lba_print_connector \
+            --without-demo=all --stop-after-init \
+            --logfile="$RUNNER_TEMP/odoo-init.log"
+
+      - name: Sembrar servidor LBA, sincronizar impresora y usuario admin
+        run: |
+          set -o pipefail
+          python "$ODOO_ROOT/odoo-bin" shell \
+            --addons-path="$ODOO_ADDONS" \
+            --db_host="$PGHOST" --db_port="$PGPORT" \
+            --db_user="$PGUSER" --db_password="$PGPASSWORD" \
+            --database="$ODOO_DB" \
+            < deploy/ci/odoo_seed_e2e.py
+
+      - name: Arrancar Odoo 19
+        run: |
+          set -euo pipefail
+          nohup python "$ODOO_ROOT/odoo-bin" \
+            --addons-path="$ODOO_ADDONS" \
+            --db_host="$PGHOST" --db_port="$PGPORT" \
+            --db_user="$PGUSER" --db_password="$PGPASSWORD" \
+            --database="$ODOO_DB" --db-filter='^lba_e2e$' \
+            --http-port=8069 --workers=0 \
+            --logfile="$RUNNER_TEMP/odoo-server.log" &
+          for _ in $(seq 1 120); do
+            if curl -fsS http://127.0.0.1:8069/web/login >/dev/null; then
+              echo "Odoo listo"; exit 0
+            fi
+            sleep 1
+          done
+          echo "Odoo no arrancó" >&2
+          tail -100 "$RUNNER_TEMP/odoo-server.log" >&2 || true
+          exit 1
+
+      - name: E2E de navegador con Chromium
+        run: |
+          python deploy/ci/odoo_browser_e2e.py \
+            --odoo-url http://127.0.0.1:8069 \
+            --lba-url http://127.0.0.1:18000 \
+            --documents-dir "$PRINTER_DOCS" \
+            --screenshots-dir "$SCREENSHOTS"
+
+      - name: Publicar documentos impresos, capturas y logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: odoo-browser-e2e
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/printer-documents/*
+            ${{ runner.temp }}/screenshots/*
+            ${{ runner.temp }}/odoo-init.log
+            ${{ runner.temp }}/odoo-server.log
+            ${{ runner.temp }}/lba-api.log
+            ${{ runner.temp }}/lba-worker.log
+            ${{ runner.temp }}/lba-simulator.log

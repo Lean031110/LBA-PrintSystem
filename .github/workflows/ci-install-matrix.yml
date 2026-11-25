@@ -1,0 +1,99 @@
+name: CI instalación Linux — paquete limpio y systemd real
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  clean-package:
+    name: Paquete limpio en ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Debian 12 (base del LXC objetivo)
+            image: debian:12
+            extra: ""
+          - name: Ubuntu 22.04 LTS
+            image: ubuntu:22.04
+            extra: ""
+          - name: Ubuntu 24.04 LTS
+            image: ubuntu:24.04
+            extra: ""
+          - name: Xubuntu 24.04 (Ubuntu + XFCE)
+            image: ubuntu:24.04
+            extra: "xfce4-session xfce4-panel xfwm4 xvfb"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Construir el paquete desde el commit
+        run: python deploy/scripts/build_packages.py --output "$RUNNER_TEMP/lba-package"
+      - name: Instalar el paquete en el sistema ${{ matrix.name }}
+        env:
+          IMAGE: ${{ matrix.image }}
+          EXTRA: ${{ matrix.extra }}
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/src:ro" \
+            -v "$RUNNER_TEMP/lba-package:/pkg:ro" \
+            -e DEBIAN_FRONTEND=noninteractive \
+            -e EXTRA="$EXTRA" \
+            "$IMAGE" bash -euxo pipefail -c '
+              apt-get update
+              apt-get install -y --no-install-recommends \
+                python3 python3-venv python3-pip ca-certificates tar gzip $EXTRA
+              cp -a /src /tmp/src
+              bash /tmp/src/deploy/scripts/verify_clean_install.sh \
+                /pkg/lba-print-server-debian12-amd64.tar.gz
+            '
+
+  systemd-install:
+    name: install.sh con systemd real en ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Debian 12
+            base: debian:12
+            tag: debian12
+          - name: Ubuntu 24.04
+            base: ubuntu:24.04
+            tag: ubuntu24
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construir imagen con systemd como PID 1
+        run: |
+          docker build \
+            --build-arg BASE=${{ matrix.base }} \
+            -t "lba-systemd:${{ matrix.tag }}" \
+            deploy/ci/systemd
+      - name: Ejecutar install.sh y validar servicios (systemd real)
+        env:
+          TAG: ${{ matrix.tag }}
+        run: |
+          set -euo pipefail
+          docker run -d --name lba-systemd --privileged --cgroupns=host \
+            -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
+            -v "$GITHUB_WORKSPACE:/src:ro" \
+            "lba-systemd:$TAG"
+          trap 'docker logs lba-systemd || true; docker rm -f lba-systemd || true' EXIT
+          for _ in $(seq 1 90); do
+            state="$(docker exec lba-systemd systemctl is-system-running 2>/dev/null || true)"
+            case "$state" in
+              running|degraded) break ;;
+            esac
+            sleep 1
+          done
+          docker exec lba-systemd systemctl is-system-running || true
+          docker exec lba-systemd bash /src/deploy/ci/test_systemd_install.sh

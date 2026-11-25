@@ -153,11 +153,21 @@ systemctl enable --now lba-print-api.service lba-print-worker.service
 # El simulador se instala, pero queda apagado en producción salvo habilitación explícita.
 
  echo "== 7) Verificación del servicio =="
-sleep 2
 PORT="$(awk -F= '$1 == "LBA_PORT" { value=$2 } END { if (value != "") print value }' "$ENV_FILE")"
 PORT="${PORT:-8000}"
 [[ "$PORT" =~ ^[0-9]{1,5}$ ]] && (( PORT >= 1 && PORT <= 65535 )) || lba_die "LBA_PORT inválido en $ENV_FILE."
 systemctl --no-pager --lines=0 status lba-print-api.service lba-print-worker.service | head -12 || true
+# El primer arranque importa la app y crea el esquema: esperar readiness
+# acotada en lugar de asumir que 2 s bastan en cualquier hardware.
+HEALTH_OK=0
+for _ in $(seq 1 60); do
+    if curl --fail --silent --show-error "http://127.0.0.1:${PORT}/api/v1/health" >/dev/null; then
+        HEALTH_OK=1
+        break
+    fi
+    sleep 1
+done
+(( HEALTH_OK == 1 )) || lba_die "la API no respondió /api/v1/health en 60 s (journalctl -u lba-print-api)."
 curl --fail --silent --show-error "http://127.0.0.1:${PORT}/api/v1/health"
 echo " → LBA Print Server responde en el puerto $PORT."
 

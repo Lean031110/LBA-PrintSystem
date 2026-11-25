@@ -610,3 +610,39 @@ Comprobaciones reproducibles localmente para este corte: suite servidor **60 pas
 ### Gates que continúan pendientes
 
 No se ejecutaron navegador OWL/TPV, Playwright, integración E2E Odoo→LBA→worker→impresora virtual, stress de varios procesos/claims, caída entre `sendall` y commit, instalación/actualización/reinicio en LXC Debian 12 con systemd real, `systemd-analyze verify` en ese entorno, bloqueo de egress para probar offline, revisión efectiva de TLS/SAN/cookie `Secure`/firewall, ni pruebas físicas autorizadas. Tampoco se accedió a la base de datos de Lo D’ Leo, se hizo escaneo LAN o se enviaron comandos a impresoras. No se declara que `sent` signifique papel impreso, no se integra en `main` y no se publica una release estable.
+
+## Addendum — instalación limpia, matriz Linux, impresora virtual, E2E de navegador y estrés (2026-11-25)
+
+Esta sección documenta la ampliación de CI y la evidencia ejecutada **hoy** en el sandbox de trabajo. Las secciones y addenda anteriores describen cortes previos; aquí se agrega cobertura nueva y se corrigen dos defectos encontrados al construirla. Nada de esto es una aprobación de producción.
+
+### Qué se agregó
+
+| Flujo / archivo | Propósito |
+|---|---|
+| `.github/workflows/ci-server.yml` → job `clean-package-install` | Construye el `tar.gz`, lo descomprime en un directorio temporal ajeno al checkout y ejecuta `deploy/scripts/verify_clean_install.sh`: venv nuevo, `pip install -r server/requirements.txt`, `pip check`, `init_db()`, `import app.main`, arranque real de uvicorn con `/api/v1/health` y `python -m app.worker --once`. Detecta archivos olvidados en el paquete y dependencias no declaradas. |
+| `.github/workflows/ci-install-matrix.yml` → job `clean-package` | Instala el paquete en contenedores **Debian 12, Ubuntu 22.04, Ubuntu 24.04 y Xubuntu 24.04** (Ubuntu + XFCE). Xubuntu comparte base y repositorios con Ubuntu LTS, por lo que se reproduce el escritorio XFCE en lugar de una ISO distinta. |
+| `.github/workflows/ci-install-matrix.yml` → job `systemd-install` | Ejecuta el `deploy/scripts/install.sh` real como root dentro de un contenedor privilegiado con **systemd como PID 1** (`deploy/ci/systemd/Dockerfile`), en Debian 12 y Ubuntu 24.04. Valida unidades habilitadas/activas, permisos, healthcheck, impresión a través de la cola, reinicio de la API y reinstalación idempotente (`deploy/ci/test_systemd_install.sh`). |
+| `.github/workflows/ci-stress.yml` | Tres escenarios de estrés con impresoras virtuales y workers reales: 300 trabajos/3 workers/3 impresoras; 150/1/1; y ráfaga de idempotencia de 80 claves × 16 envíos simultáneos. |
+| `deploy/scripts/stress_test.py` | Envío concurrente, verificación de 202/409 exactos, drenaje de cola, `sent` para todos, un documento por trabajo con SHA-256 válido, ausencia de claves duplicadas y `PRAGMA integrity_check`. Genera informe JSON con latencias y throughput. |
+| `.github/workflows/ci-odoo-browser-e2e.yml` + `deploy/ci/odoo_browser_e2e.py` | Instala Odoo 19 (commit fijo), el addon, PostgreSQL 16, el servidor LBA, un worker y una **impresora virtual**, y opera Chromium con Playwright: login, lista de impresoras, «Probar conexión», «Sincronizar impresoras», «Impresión de prueba» → «Enviar a la impresora». El éxito exige un trabajo `sent` y un documento escrito por la impresora virtual. |
+| `deploy/ci/odoo_seed_e2e.py` | Siembra el usuario admin, el registro `lba.print.server` con el token, ejecuta conexión/sincronización y asigna la impresora a las plantillas. |
+| `server/app/drivers/simulator.py --save-dir` | **Impresora virtual con papel en disco**: por cada documento recibido escribe `document-NNNN-<sha>.escpos.bin` (bytes exactos), `.txt` (reconstrucción legible) y una línea en `documents.jsonl` con hash, tamaño y hora. Es la validación de que la impresión llegó al destino, sin hardware. |
+| `server/tests/test_virtual_printer.py` | Regresiones del papel virtual y del parser de preview. |
+
+### Evidencia ejecutada hoy (sandbox, no CI remoto)
+
+- Suite del servidor: `cd server && PYTHONPATH=. .venv/bin/python -m pytest -q` → **62 passed, 46 warnings** (60 previos + 2 nuevos). Los warnings son los mismos Starlette/httpx y SQLAlchemy/SQLite ya documentados; no son fallos.
+- Instalación limpia real desde el paquete: paquete construido desde un snapshot limpio del árbol (`16184c3...`) y `bash deploy/scripts/verify_clean_install.sh …` → **CLEAN INSTALL OK**: sin requisitos rotos, BD/tablas creadas, credenciales y `secret_key` en modo 0600, `/api/v1/health` con solo las cuatro claves públicas y worker `--once` correcto.
+- Estrés local: `deploy/scripts/stress_test.py --jobs 300 --duplicates 30 --burst 10 --concurrency 24 --workers 3 --printers 3` → 600 peticiones (330 `202` + 270 `409`), **330 documentos** con hash único, `integrity_check=ok`, ~284 req/s de admisión y ~90 trabajos/s de drenaje; p50 68.8 ms / p95 136.1 ms. También pasó el escenario 120/2/2 y 140 trabajos únicos.
+- Sintaxis: `bash -n` en los scripts nuevos y modificados, `py_compile` de los scripts de CI y **parseo YAML de los 5 workflows** → OK.
+- Defectos corregidos durante la ampliación: (a) `preview.render_preview` entraba en **bucle infinito** ante un comando `ESC` desconocido (encontrado con bytes de control en la impresora virtual); ahora consume el comando y hay test de regresión; (b) `install.sh` verificaba salud una sola vez tras 2 s; ahora espera readiness hasta 60 s y falla con diagnóstico. También se añadió `workflow_dispatch` a los workflows para poder ejecutarlos manualmente sobre una rama de QA.
+
+### Límites explícitos de esta evidencia
+
+1. Los workflows nuevos **no se han ejecutado en GitHub** desde este sandbox: no hay Docker ni Actions aquí, así que la matriz de distros, la instalación con systemd real y el E2E de Odoo/Chromium están definidos y validados solo en sintaxis y en sus componentes locales. No se declara que estén verdes.
+2. El E2E de navegador depende de selectores de la UI de Odoo 19 (acción por xmlid, botones y notificaciones); si Odoo cambia el DOM, el job fallará y habrá que ajustar selectores. No se observó ninguna ejecución real de Playwright contra Odoo en este entorno.
+3. La instalación con systemd se validó localmente solo por revisión y pruebas unitarias con mocks; el flujo real requiere el contenedor privilegiado de CI. No se probó en un LXC de producción ni tras reiniciar el host.
+4. La impresora virtual demuestra que los bytes llegaron a un socket y se materializaron como documento; **no** demuestra impresión térmica, legibilidad física, corte ni calibración. Sigue vigente que `sent` significa «bytes transmitidos», no papel impreso.
+5. No se cubren otras familias Linux (Fedora/RHEL/Arch): `install.sh` exige `apt-get`/systemd Debian-Ubuntu; el paquete Python podría funcionar, pero no se afirma soporte.
+6. Las pruebas de estrés usan SQLite/WAL y procesos locales; no modelan disco lleno, red lenta, cortes de energía ni caída entre `sendall` y commit. No se afirma exactly-once.
+7. No se ejecutaron pruebas físicas ni se contactó la base ni la LAN de Lo D’ Leo.
