@@ -182,7 +182,11 @@ class LbaPrintPreviewWizard(models.TransientModel):
         key = "test:%s:%s:%d" % (
             template.id, fields.Datetime.now().strftime("%Y%m%d%H%M%S"),
             printer.id)
-        job = Job.create({
+        # El guard de lba.print.job::create bloquea a los usuarios TPV para que
+        # no puedan inyectar payloads por RPC. Aquí el documento lo genera el
+        # servidor desde la plantilla y el acceso lo limita la ACL del asistente
+        # (usuarios TPV), así que se crea con sudo igual que el controlador.
+        job = Job.sudo().create({
             "printer_id": printer.id,
             "kind": "test",
             "payload_json": json.dumps(document),

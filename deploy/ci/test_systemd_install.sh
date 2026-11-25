@@ -57,9 +57,10 @@ log "Archivos, permisos y credenciales"
 grep -q '^LBA_PORT=8000$' /etc/lba-print/lba-print.env || fail "LBA_PORT ausente"
 # Regresión: con umask restrictivo el venv quedaba en 0700 root y el usuario de
 # servicio no podía ejecutar el intérprete (env: Permission denied).
-sudo -u lba test -x /opt/lba/server/.venv/bin/python || \
+command -v runuser >/dev/null || fail "runuser (util-linux) no está disponible"
+runuser -u lba -- test -x /opt/lba/server/.venv/bin/python || \
     fail "el usuario lba no puede ejecutar el python del venv (permisos)"
-sudo -u lba env PYTHONPATH=/opt/lba/server /opt/lba/server/.venv/bin/python \
+runuser -u lba -- env PYTHONPATH=/opt/lba/server /opt/lba/server/.venv/bin/python \
     -c 'import app.main' >/dev/null 2>&1 || \
     fail "el usuario lba no puede importar app.main con el venv instalado"
 
