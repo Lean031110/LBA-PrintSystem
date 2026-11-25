@@ -638,7 +638,7 @@ Esta sección documenta la ampliación de CI y la evidencia ejecutada **hoy** en
 
 ### Resultados reales en GitHub Actions
 
-Los workflows se ejecutaron sobre el PR en borrador [#1](https://github.com/Lean031110/LBA-PrintSystem/pull/1) (el `workflow_dispatch` no está disponible hasta que el workflow exista en la rama por defecto). En el commit final `85905f3` **pasan todos los jobs**:
+Los workflows se ejecutaron sobre el PR en borrador [#1](https://github.com/Lean031110/LBA-PrintSystem/pull/1) (el `workflow_dispatch` no está disponible hasta que el workflow exista en la rama por defecto). En el commit `e41a9bc` (último con cambios de código; los commits posteriores solo tocan documentación) **pasan los 13 checks**:
 
 | Workflow / job | Resultado |
 |---|---|
